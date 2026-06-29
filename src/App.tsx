@@ -13,6 +13,7 @@ import {
   Search,
   SlidersHorizontal,
   Star,
+  Trash2,
   X,
   Wine,
 } from "lucide-react";
@@ -353,6 +354,11 @@ const copy = {
     removeBottle: "Remove one bottle",
     addBottle: "Add one bottle",
     removeFromCellar: "Remove from cellar",
+    deleteWine: "Delete wine",
+    deleteTasting: "Delete tasting",
+    confirmDeleteWine: "Delete this wine? Existing tastings are kept as history.",
+    confirmDeleteTasting:
+      "Delete this tasting? Any own bottle or Coravin cellar adjustment is restored.",
     saveWineInCellar: "Save wine in cellar",
     wineName: "Wine name",
     wineNamePlaceholder: "Barolo, Riesling, Châteauneuf-du-Pape...",
@@ -439,6 +445,11 @@ const copy = {
     removeBottle: "Fjern en flaske",
     addBottle: "Tilføj en flaske",
     removeFromCellar: "Fjern fra kælder",
+    deleteWine: "Slet vin",
+    deleteTasting: "Slet smagning",
+    confirmDeleteWine: "Slet denne vin? Eksisterende smagninger bevares som historik.",
+    confirmDeleteTasting:
+      "Slet denne smagning? Eventuel egen flaske eller Coravin-træk lægges tilbage i kælderen.",
     saveWineInCellar: "Gem vin i kælderen",
     wineName: "Vinens navn",
     wineNamePlaceholder: "Barolo, Riesling, Châteauneuf-du-Pape...",
@@ -814,6 +825,20 @@ function App() {
     );
   }
 
+  function deleteWine(wineId: string) {
+    if (!window.confirm(t.confirmDeleteWine)) return;
+
+    setWines((current) => current.filter((wine) => wine.id !== wineId));
+    setTastings((current) =>
+      current.map((tasting) =>
+        tasting.wineId === wineId ? { ...tasting, wineId: null } : tasting,
+      ),
+    );
+    setTastingForm((current) =>
+      current.wineId === wineId ? { ...current, wineId: "" } : current,
+    );
+  }
+
   function toggleListValue(
     value: string,
     setter: Dispatch<SetStateAction<string[]>>,
@@ -949,6 +974,25 @@ function App() {
     setSelectedPalateNotes(safeNotes(tasting));
     setSelectedStructureNotes(tasting.structureNotes ?? []);
     setActiveTab("tasting");
+  }
+
+  function deleteTasting(tasting: TastingRecord) {
+    if (!window.confirm(t.confirmDeleteTasting)) return;
+
+    if (tasting.wineId) {
+      applyBottleDeltas([
+        {
+          wineId: tasting.wineId,
+          amount: -getConsumptionDelta(tasting.source),
+        },
+      ]);
+    }
+
+    setTastings((current) => current.filter((item) => item.id !== tasting.id));
+
+    if (editingTastingId === tasting.id) {
+      resetTastingForm();
+    }
   }
 
   function getWineRating(wineId: string) {
@@ -1184,6 +1228,14 @@ function App() {
                         type="button"
                       >
                         {t.removeFromCellar}
+                      </button>
+                      <button
+                        className="iconButton dangerIcon"
+                        onClick={() => deleteWine(wine.id)}
+                        title={t.deleteWine}
+                        type="button"
+                      >
+                        <Trash2 size={17} />
                       </button>
                     </div>
                   </div>
@@ -1692,6 +1744,14 @@ function App() {
                   >
                     <Edit3 size={17} />
                     {t.edit}
+                  </button>
+                  <button
+                    className="ghostButton dangerButton compactButton"
+                    onClick={() => deleteTasting(tasting)}
+                    type="button"
+                  >
+                    <Trash2 size={17} />
+                    {t.deleteTasting}
                   </button>
                 </div>
               </article>

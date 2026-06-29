@@ -52,7 +52,9 @@ alter table public.wines enable row level security;
 alter table public.tastings enable row level security;
 
 -- Temporary beginner-friendly policies.
--- Later, when login is added, these should be changed so each user only sees their own data.
+-- Later, when login is added, add a user_id/owner_id column to each table,
+-- connect it to auth.users, and change these policies so each user only sees
+-- and changes their own wines and tastings.
 create policy "Allow all reads for wines"
 on public.wines
 for select
@@ -72,6 +74,12 @@ to anon
 using (true)
 with check (true);
 
+create policy "Allow all deletes for wines"
+on public.wines
+for delete
+to anon
+using (true);
+
 create policy "Allow all reads for tastings"
 on public.tastings
 for select
@@ -83,3 +91,16 @@ on public.tastings
 for insert
 to anon
 with check (true);
+
+create policy "Allow all updates for tastings"
+on public.tastings
+for update
+to anon
+using (true)
+with check (true);
+
+create policy "Allow all deletes for tastings"
+on public.tastings
+for delete
+to anon
+using (true);

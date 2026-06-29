@@ -340,10 +340,20 @@ h3 {
   padding: 0;
 }
 
+.dangerIcon {
+  background: #f8e9e9;
+  color: #8b1e2d;
+}
+
 .ghostButton {
   background: transparent;
   border-color: rgba(122, 23, 57, 0.26);
   color: #7a1739;
+}
+
+.dangerButton {
+  border-color: rgba(139, 30, 45, 0.3);
+  color: #8b1e2d;
 }
 
 .primaryButton {

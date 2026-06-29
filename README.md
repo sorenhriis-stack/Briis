@@ -11,6 +11,7 @@ Første version indeholder:
 - blindgæt på årgang, drue, område, kommune og producent
 - rating på 1-100 point
 - redigering af smagninger
+- sletning af vine og smagninger
 - sprogvalg mellem engelsk og dansk
 - kladdevenlig smagning hvor rating og facit kan stå tomt
 - filtrering og sortering af kælder på årgang, område, drue og producent
@@ -38,3 +39,8 @@ Databasen er ikke koblet på appen endnu. Første SQL-udkast ligger i:
 ```text
 supabase/schema.sql
 ```
+
+Næste store tekniske trin er Supabase Auth, så appen kan deles med andre.
+Planen er ikke én separat database per bruger, men én fælles database hvor hver vin og
+smagning får et `user_id`. Supabase Row Level Security skal derefter sikre, at brugere
+kun kan se og ændre deres egne data.
