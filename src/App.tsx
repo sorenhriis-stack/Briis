@@ -1,4 +1,5 @@
 import { Dispatch, FormEvent, SetStateAction, useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import {
   Archive,
   BadgePlus,
@@ -10,6 +11,9 @@ import {
   ClipboardList,
   Edit3,
   Grape,
+  LogIn,
+  LogOut,
+  RefreshCw,
   Search,
   SlidersHorizontal,
   Star,
@@ -17,6 +21,7 @@ import {
   X,
   Wine,
 } from "lucide-react";
+import { isSupabaseConfigured, supabase } from "./supabaseClient";
 
 type Tab = "cellar" | "add" | "tasting" | "ratings";
 type Language = "en" | "da";
@@ -67,6 +72,44 @@ type TastingRecord = {
   };
   guessScore: number | null;
   tastingNotes?: string[];
+};
+
+type DbWineRow = {
+  id: string;
+  name: string;
+  producer: string | null;
+  vintage: number | null;
+  grape: string | null;
+  region: string | null;
+  commune: string | null;
+  country: string | null;
+  bottle_count: number | string | null;
+  external_rating_source: string | null;
+  external_rating_score: number | null;
+  created_at: string;
+};
+
+type DbTastingRow = {
+  id: string;
+  wine_id: string | null;
+  wine_name_snapshot: string;
+  tasted_at: string;
+  source: TastingSource;
+  rating: number | null;
+  color: string | null;
+  nose_notes: string[] | null;
+  palate_notes: string[] | null;
+  structure_notes: string[] | null;
+  acidity: string | null;
+  tannin: string | null;
+  custom_note: string | null;
+  guess_vintage: number | null;
+  guess_grape: string | null;
+  guess_region: string | null;
+  guess_commune: string | null;
+  guess_producer: string | null;
+  guess_score: number | null;
+  created_at: string;
 };
 
 type WineForm = {
@@ -272,51 +315,6 @@ const structureOptions: LocalizedOption[] = [
   { value: "Oxidativ", label: { en: "Oxidative", da: "Oxidativ" } },
 ];
 
-const starterWines: WineRecord[] = [
-  {
-    id: "starter-1",
-    name: "Barolo",
-    producer: "Cascina Fontana",
-    vintage: 2019,
-    grape: "Nebbiolo",
-    region: "Piemonte",
-    commune: "Barolo",
-    country: "Italien",
-    bottleCount: 3,
-    externalRatingSource: "Manuel reference",
-    externalRatingScore: 93,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "starter-2",
-    name: "Bourgogne Pinot Noir",
-    producer: "Domaine Leflaive",
-    vintage: 2021,
-    grape: "Pinot Noir",
-    region: "Bourgogne",
-    commune: "Puligny-Montrachet",
-    country: "Frankrig",
-    bottleCount: 2,
-    externalRatingSource: "",
-    externalRatingScore: null,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "starter-3",
-    name: "Ribera del Duero",
-    producer: "Bodegas Aalto",
-    vintage: 2020,
-    grape: "Tempranillo",
-    region: "Castilla y León",
-    commune: "Ribera del Duero",
-    country: "Spanien",
-    bottleCount: 4,
-    externalRatingSource: "Manuel reference",
-    externalRatingScore: 94,
-    createdAt: new Date().toISOString(),
-  },
-];
-
 const sourceLabels: Record<TastingSource, LocalizedText> = {
   own_bottle: { en: "Own bottle", da: "Egen flaske" },
   coravin: { en: "Coravin", da: "Coravin" },
@@ -411,6 +409,17 @@ const copy = {
     language: "Language",
     english: "English",
     danish: "Danish",
+    signInTitle: "Sign in to Briis",
+    signInText: "Use Google login to save your cellar and tastings securely in Supabase.",
+    signInWithGoogle: "Sign in with Google",
+    signOut: "Sign out",
+    signedInAs: "Signed in as",
+    loadingAccount: "Checking login...",
+    loadingData: "Loading your cellar...",
+    refreshData: "Refresh data",
+    syncError: "Sync error",
+    missingSupabaseConfig: "Supabase is missing URL or publishable key.",
+    noWines: "No wines in your cellar yet.",
     draftTitle: "Draft-friendly",
     draftText: "You can save a tasting with only one field filled in, or with nothing but today's date.",
     untitledTasting: "Untitled tasting",
@@ -502,6 +511,17 @@ const copy = {
     language: "Sprog",
     english: "Engelsk",
     danish: "Dansk",
+    signInTitle: "Log ind på Briis",
+    signInText: "Brug Google-login til at gemme din kælder og dine smagninger sikkert i Supabase.",
+    signInWithGoogle: "Log ind med Google",
+    signOut: "Log ud",
+    signedInAs: "Logget ind som",
+    loadingAccount: "Tjekker login...",
+    loadingData: "Henter din kælder...",
+    refreshData: "Genindlæs data",
+    syncError: "Synkroniseringsfejl",
+    missingSupabaseConfig: "Supabase mangler URL eller publishable key.",
+    noWines: "Ingen vine i kælderen endnu.",
     draftTitle: "Kladdevenlig",
     draftText: "Du kan gemme en smagning med kun ét udfyldt felt, eller helt uden andet end datoen.",
     untitledTasting: "Smagning uden titel",
@@ -622,14 +642,102 @@ function displayStructure(value: string, language: Language) {
   return labelForOption(structureOptions, value, language);
 }
 
+function dbWineToRecord(row: DbWineRow): WineRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    producer: row.producer ?? "",
+    vintage: row.vintage,
+    grape: row.grape ?? "",
+    region: row.region ?? "",
+    commune: row.commune ?? "",
+    country: row.country ?? "",
+    bottleCount: Number(row.bottle_count ?? 0),
+    externalRatingSource: row.external_rating_source ?? "",
+    externalRatingScore: row.external_rating_score,
+    createdAt: row.created_at,
+  };
+}
+
+function wineToDbRow(wine: WineRecord) {
+  return {
+    id: wine.id,
+    name: wine.name,
+    producer: wine.producer || null,
+    vintage: wine.vintage,
+    grape: wine.grape || null,
+    region: wine.region || null,
+    commune: wine.commune || null,
+    country: wine.country || null,
+    bottle_count: wine.bottleCount,
+    external_rating_source: wine.externalRatingSource || null,
+    external_rating_score: wine.externalRatingScore,
+  };
+}
+
+function dbTastingToRecord(row: DbTastingRow): TastingRecord {
+  return {
+    id: row.id,
+    wineId: row.wine_id,
+    wineNameSnapshot: row.wine_name_snapshot,
+    tastedAt: row.tasted_at,
+    source: row.source,
+    rating: row.rating,
+    color: row.color ?? "",
+    noseNotes: row.nose_notes ?? [],
+    palateNotes: row.palate_notes ?? [],
+    structureNotes: row.structure_notes ?? [],
+    acidity: row.acidity ?? "",
+    tannin: row.tannin ?? "",
+    customNote: row.custom_note ?? "",
+    guesses: {
+      vintage: row.guess_vintage,
+      grape: row.guess_grape ?? "",
+      region: row.guess_region ?? "",
+      commune: row.guess_commune ?? "",
+      producer: row.guess_producer ?? "",
+    },
+    guessScore: row.guess_score,
+  };
+}
+
+function tastingToDbRow(tasting: TastingRecord) {
+  return {
+    id: tasting.id,
+    wine_id: tasting.wineId,
+    wine_name_snapshot: tasting.wineNameSnapshot,
+    tasted_at: tasting.tastedAt,
+    source: tasting.source,
+    rating: tasting.rating,
+    color: tasting.color || null,
+    nose_notes: tasting.noseNotes,
+    palate_notes: tasting.palateNotes,
+    structure_notes: tasting.structureNotes,
+    acidity: tasting.acidity || null,
+    tannin: tasting.tannin || null,
+    custom_note: tasting.customNote || null,
+    guess_vintage: tasting.guesses.vintage,
+    guess_grape: tasting.guesses.grape || null,
+    guess_region: tasting.guesses.region || null,
+    guess_commune: tasting.guesses.commune || null,
+    guess_producer: tasting.guesses.producer || null,
+    guess_score: tasting.guessScore,
+  };
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
 function App() {
   const [language, setLanguage] = useStoredState<Language>("briis.language", "en");
   const [activeTab, setActiveTab] = useState<Tab>("cellar");
-  const [wines, setWines] = useStoredState<WineRecord[]>("briis.wines", starterWines);
-  const [tastings, setTastings] = useStoredState<TastingRecord[]>(
-    "briis.tastings",
-    [],
-  );
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [wines, setWines] = useState<WineRecord[]>([]);
+  const [tastings, setTastings] = useState<TastingRecord[]>([]);
   const [customNoteOptions, setCustomNoteOptions] = useStoredState<CustomNotesByCategory>(
     "briis.customNotesByCategory",
     {},
@@ -650,6 +758,99 @@ function App() {
   });
   const [editingTastingId, setEditingTastingId] = useState<string | null>(null);
   const t = copy[language];
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) {
+      setAuthLoading(false);
+      setSyncError(t.missingSupabaseConfig);
+      return;
+    }
+
+    let isMounted = true;
+
+    client.auth.getSession().then(({ data, error }) => {
+      if (!isMounted) return;
+      if (error) setSyncError(error.message);
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setSyncError(null);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [t.missingSupabaseConfig]);
+
+  useEffect(() => {
+    if (!session) {
+      setWines([]);
+      setTastings([]);
+      setDataLoading(false);
+      return;
+    }
+
+    void loadUserData();
+  }, [session?.user.id]);
+
+  async function loadUserData() {
+    const client = supabase;
+    if (!client || !session) return;
+
+    setDataLoading(true);
+    setSyncError(null);
+
+    try {
+      const [wineResult, tastingResult] = await Promise.all([
+        client.from("wines").select("*").order("created_at", { ascending: false }),
+        client.from("tastings").select("*").order("created_at", { ascending: false }),
+      ]);
+
+      if (wineResult.error) throw wineResult.error;
+      if (tastingResult.error) throw tastingResult.error;
+
+      setWines((wineResult.data ?? []).map((row) => dbWineToRecord(row as DbWineRow)));
+      setTastings(
+        (tastingResult.data ?? []).map((row) => dbTastingToRecord(row as DbTastingRow)),
+      );
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    } finally {
+      setDataLoading(false);
+    }
+  }
+
+  async function signInWithGoogle() {
+    const client = supabase;
+    if (!client) {
+      setSyncError(t.missingSupabaseConfig);
+      return;
+    }
+
+    const { error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+
+    if (error) setSyncError(error.message);
+  }
+
+  async function signOut() {
+    const client = supabase;
+    if (!client) return;
+
+    const { error } = await client.auth.signOut();
+    if (error) setSyncError(error.message);
+  }
 
   const noteGroups = useMemo(() => {
     return noteCategories.map((category) => ({
@@ -757,8 +958,14 @@ function App() {
     setCellarFilters((current) => ({ ...current, [field]: value }));
   }
 
-  function addWine(event: FormEvent<HTMLFormElement>) {
+  async function addWine(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const client = supabase;
+    if (!client || !session) {
+      setSyncError(t.missingSupabaseConfig);
+      return;
+    }
 
     const wine: WineRecord = {
       id: createId(),
@@ -777,66 +984,125 @@ function App() {
 
     if (!wine.name) return;
 
-    setWines((current) => [wine, ...current]);
-    setWineForm(defaultWineForm);
-    setActiveTab("cellar");
+    setSyncError(null);
+
+    try {
+      const { data, error } = await client
+        .from("wines")
+        .insert(wineToDbRow(wine))
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      setWines((current) => [dbWineToRecord(data as DbWineRow), ...current]);
+      setWineForm(defaultWineForm);
+      setActiveTab("cellar");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    }
+  }
+
+  async function updateWineBottleCount(wineId: string, bottleCount: number) {
+    const client = supabase;
+    if (!client || !session) return;
+
+    setWines((current) =>
+      current.map((wine) => (wine.id === wineId ? { ...wine, bottleCount } : wine)),
+    );
+
+    const { error } = await client
+      .from("wines")
+      .update({ bottle_count: bottleCount })
+      .eq("id", wineId);
+
+    if (error) {
+      setSyncError(error.message);
+      await loadUserData();
+    }
   }
 
   function changeBottleCount(wineId: string, amount: number) {
-    setWines((current) =>
-      current.map((wine) =>
-        wine.id === wineId
-          ? {
-              ...wine,
-              bottleCount: Math.max(
-                0,
-                Number((wine.bottleCount + amount).toFixed(1)),
-              ),
-            }
-          : wine,
-      ),
+    const wine = wines.find((item) => item.id === wineId);
+    if (!wine) return;
+
+    const nextBottleCount = Math.max(
+      0,
+      Number((wine.bottleCount + amount).toFixed(1)),
     );
+
+    void updateWineBottleCount(wineId, nextBottleCount);
   }
 
-  function applyBottleDeltas(deltas: Array<{ wineId: string; amount: number }>) {
+  async function applyBottleDeltas(deltas: Array<{ wineId: string; amount: number }>) {
+    const client = supabase;
     if (deltas.length === 0) return;
+    if (!client || !session) return;
 
-    setWines((current) =>
-      current.map((wine) => {
-        const amount = deltas
-          .filter((delta) => delta.wineId === wine.id)
-          .reduce((sum, delta) => sum + delta.amount, 0);
+    const amountByWineId = new Map<string, number>();
+    deltas.forEach((delta) => {
+      amountByWineId.set(
+        delta.wineId,
+        (amountByWineId.get(delta.wineId) ?? 0) + delta.amount,
+      );
+    });
 
-        if (amount === 0) return wine;
+    const nextWines = wines.map((wine) => {
+      const amount = amountByWineId.get(wine.id) ?? 0;
+      if (amount === 0) return wine;
 
-        return {
-          ...wine,
-          bottleCount: Math.max(0, Number((wine.bottleCount + amount).toFixed(1))),
-        };
-      }),
+      return {
+        ...wine,
+        bottleCount: Math.max(0, Number((wine.bottleCount + amount).toFixed(1))),
+      };
+    });
+    const changedWines = nextWines.filter((wine) => amountByWineId.has(wine.id));
+
+    setWines(nextWines);
+
+    const results = await Promise.all(
+      changedWines.map((wine) =>
+        client
+          .from("wines")
+          .update({ bottle_count: wine.bottleCount })
+          .eq("id", wine.id),
+      ),
     );
+    const failedResult = results.find((result) => result.error);
+
+    if (failedResult?.error) {
+      throw failedResult.error;
+    }
   }
 
   function removeFromCellar(wineId: string) {
-    setWines((current) =>
-      current.map((wine) =>
-        wine.id === wineId ? { ...wine, bottleCount: 0 } : wine,
-      ),
-    );
+    void updateWineBottleCount(wineId, 0);
   }
 
-  function deleteWine(wineId: string) {
+  async function deleteWine(wineId: string) {
     if (!window.confirm(t.confirmDeleteWine)) return;
 
-    setWines((current) => current.filter((wine) => wine.id !== wineId));
-    setTastings((current) =>
-      current.map((tasting) =>
-        tasting.wineId === wineId ? { ...tasting, wineId: null } : tasting,
-      ),
-    );
-    setTastingForm((current) =>
-      current.wineId === wineId ? { ...current, wineId: "" } : current,
-    );
+    const client = supabase;
+    if (!client || !session) return;
+
+    setSyncError(null);
+
+    try {
+      const { error } = await client.from("wines").delete().eq("id", wineId);
+      if (error) throw error;
+
+      setWines((current) => current.filter((wine) => wine.id !== wineId));
+      setTastings((current) =>
+        current.map((tasting) =>
+          tasting.wineId === wineId ? { ...tasting, wineId: null } : tasting,
+        ),
+      );
+      setTastingForm((current) =>
+        current.wineId === wineId ? { ...current, wineId: "" } : current,
+      );
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    }
   }
 
   function toggleListValue(
@@ -889,8 +1155,14 @@ function App() {
     setEditingTastingId(null);
   }
 
-  function saveTasting(event: FormEvent<HTMLFormElement>) {
+  async function saveTasting(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const client = supabase;
+    if (!client || !session) {
+      setSyncError(t.missingSupabaseConfig);
+      return;
+    }
 
     const selectedWine = wines.find((wine) => wine.id === tastingForm.wineId);
     const guesses: TastingRecord["guesses"] = {
@@ -944,13 +1216,40 @@ function App() {
       });
     }
 
-    setTastings((current) => {
-      if (!editingTastingId) return [tasting, ...current];
-      return current.map((item) => (item.id === editingTastingId ? tasting : item));
-    });
-    applyBottleDeltas(deltas);
-    resetTastingForm();
-    setActiveTab("ratings");
+    setSyncError(null);
+
+    try {
+      const request = editingTastingId
+        ? client
+            .from("tastings")
+            .update(tastingToDbRow(tasting))
+            .eq("id", editingTastingId)
+            .select("*")
+            .single()
+        : client
+            .from("tastings")
+            .insert(tastingToDbRow(tasting))
+            .select("*")
+            .single();
+      const { data, error } = await request;
+
+      if (error) throw error;
+
+      const savedTasting = dbTastingToRecord(data as DbTastingRow);
+
+      setTastings((current) => {
+        if (!editingTastingId) return [savedTasting, ...current];
+        return current.map((item) =>
+          item.id === editingTastingId ? savedTasting : item,
+        );
+      });
+      await applyBottleDeltas(deltas);
+      resetTastingForm();
+      setActiveTab("ratings");
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+      await loadUserData();
+    }
   }
 
   function editTasting(tasting: TastingRecord) {
@@ -976,22 +1275,35 @@ function App() {
     setActiveTab("tasting");
   }
 
-  function deleteTasting(tasting: TastingRecord) {
+  async function deleteTasting(tasting: TastingRecord) {
     if (!window.confirm(t.confirmDeleteTasting)) return;
 
-    if (tasting.wineId) {
-      applyBottleDeltas([
-        {
-          wineId: tasting.wineId,
-          amount: -getConsumptionDelta(tasting.source),
-        },
-      ]);
-    }
+    const client = supabase;
+    if (!client || !session) return;
 
-    setTastings((current) => current.filter((item) => item.id !== tasting.id));
+    setSyncError(null);
 
-    if (editingTastingId === tasting.id) {
-      resetTastingForm();
+    try {
+      const { error } = await client.from("tastings").delete().eq("id", tasting.id);
+      if (error) throw error;
+
+      if (tasting.wineId) {
+        await applyBottleDeltas([
+          {
+            wineId: tasting.wineId,
+            amount: -getConsumptionDelta(tasting.source),
+          },
+        ]);
+      }
+
+      setTastings((current) => current.filter((item) => item.id !== tasting.id));
+
+      if (editingTastingId === tasting.id) {
+        resetTastingForm();
+      }
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+      await loadUserData();
     }
   }
 
@@ -1042,6 +1354,67 @@ function App() {
           </div>
         </div>
       </section>
+
+      {syncError && (
+        <div className="statusBanner errorBanner">
+          <strong>{t.syncError}</strong>
+          <span>{syncError}</span>
+        </div>
+      )}
+
+      {authLoading && (
+        <section className="authPanel">
+          <RefreshCw size={22} />
+          <div>
+            <h2>{t.loadingAccount}</h2>
+          </div>
+        </section>
+      )}
+
+      {!authLoading && !session && (
+        <section className="authPanel loginPanel">
+          <LogIn size={28} />
+          <div>
+            <h2>{t.signInTitle}</h2>
+            <p>{t.signInText}</p>
+          </div>
+          <button
+            className="primaryButton"
+            disabled={!isSupabaseConfigured}
+            onClick={signInWithGoogle}
+            type="button"
+          >
+            <LogIn size={18} />
+            {t.signInWithGoogle}
+          </button>
+        </section>
+      )}
+
+      {!authLoading && session && (
+        <>
+          <section className="authPanel accountPanel">
+            <div>
+              <p className="eyebrow">{t.signedInAs}</p>
+              <h2>{session.user.email}</h2>
+            </div>
+            <div className="accountActions">
+              <button className="ghostButton" onClick={loadUserData} type="button">
+                <RefreshCw size={17} />
+                {t.refreshData}
+              </button>
+              <button className="ghostButton" onClick={signOut} type="button">
+                <LogOut size={17} />
+                {t.signOut}
+              </button>
+            </div>
+          </section>
+
+          {dataLoading && (
+            <div className="statusBanner">
+              <RefreshCw size={18} />
+              <span>{t.loadingData}</span>
+            </div>
+          )}
 
       <nav className="tabs" aria-label={t.tabsLabel}>
         <button
@@ -1242,6 +1615,12 @@ function App() {
                 </article>
               );
             })}
+            {!dataLoading && filteredCellarWines.length === 0 && (
+              <div className="emptyState">
+                <BottleWine size={36} />
+                <p>{t.noWines}</p>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -1758,6 +2137,8 @@ function App() {
             ))}
           </div>
         </section>
+      )}
+        </>
       )}
     </main>
   );

@@ -34,6 +34,11 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .appShell {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
@@ -192,6 +197,60 @@ h3 {
 .tabs button.active {
   background: #7a1739;
   color: #fff7ec;
+}
+
+.authPanel,
+.statusBanner {
+  align-items: center;
+  background: rgba(255, 253, 250, 0.82);
+  border: 1px solid rgba(55, 47, 39, 0.14);
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 14px;
+}
+
+.authPanel > svg,
+.statusBanner > svg {
+  color: #7a1739;
+  flex: 0 0 auto;
+}
+
+.authPanel p,
+.statusBanner span {
+  color: #6c635b;
+  margin-bottom: 0;
+}
+
+.loginPanel {
+  align-items: center;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.accountPanel {
+  justify-content: space-between;
+}
+
+.accountActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.statusBanner {
+  color: #173d33;
+}
+
+.errorBanner {
+  align-items: start;
+  background: rgba(248, 233, 233, 0.9);
+  border-color: rgba(139, 30, 45, 0.26);
+  color: #8b1e2d;
+  display: grid;
+  grid-template-columns: 1fr;
 }
 
 .viewStack,
@@ -554,6 +613,10 @@ input:disabled {
   min-height: 180px;
 }
 
+.wineGrid .emptyState {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 920px) {
   .topbar {
     grid-template-columns: 1fr;
@@ -583,6 +646,7 @@ input:disabled {
 
   .metricStrip,
   .tabs,
+  .loginPanel,
   .filterPanel,
   .wineGrid,
   .formGrid {
@@ -594,6 +658,15 @@ input:disabled {
   }
 
   .tabs button {
+    justify-content: flex-start;
+  }
+
+  .accountPanel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .accountActions {
     justify-content: flex-start;
   }
 

@@ -1,8 +1,16 @@
--- Briis database schema for Supabase
--- Run this later in Supabase: Project -> SQL Editor -> New query -> Run.
+-- Briis Supabase schema
+-- Run in Supabase: Project -> SQL Editor -> New query -> Run.
+--
+-- Goal:
+-- Each logged-in user gets private wines and tastings.
+-- This uses one shared database, but every row has user_id.
+-- Row Level Security makes sure users only see and change their own rows.
+
+create extension if not exists "pgcrypto";
 
 create table if not exists public.wines (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade default auth.uid(),
   name text not null,
   producer text,
   vintage integer,
@@ -21,6 +29,7 @@ create table if not exists public.wines (
 
 create table if not exists public.tastings (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade default auth.uid(),
   wine_id uuid references public.wines(id) on delete set null,
   wine_name_snapshot text not null,
   tasted_at date not null default current_date,
@@ -48,59 +57,126 @@ create table if not exists public.tastings (
   created_at timestamptz not null default now()
 );
 
+-- If an older beginner version of the tables already exists, add user_id safely.
+alter table public.wines
+add column if not exists user_id uuid references auth.users(id) on delete cascade default auth.uid();
+
+alter table public.tastings
+add column if not exists user_id uuid references auth.users(id) on delete cascade default auth.uid();
+
+alter table public.wines
+alter column user_id set default auth.uid();
+
+alter table public.tastings
+alter column user_id set default auth.uid();
+
 alter table public.wines enable row level security;
 alter table public.tastings enable row level security;
 
--- Temporary beginner-friendly policies.
--- Later, when login is added, add a user_id/owner_id column to each table,
--- connect it to auth.users, and change these policies so each user only sees
--- and changes their own wines and tastings.
-create policy "Allow all reads for wines"
+revoke all on public.wines from anon;
+revoke all on public.tastings from anon;
+
+grant select, insert, update, delete on public.wines to authenticated;
+grant select, insert, update, delete on public.tastings to authenticated;
+
+-- Remove old open policies if this script is run after the beginner version.
+drop policy if exists "Allow all reads for wines" on public.wines;
+drop policy if exists "Allow all writes for wines" on public.wines;
+drop policy if exists "Allow all updates for wines" on public.wines;
+drop policy if exists "Allow all deletes for wines" on public.wines;
+
+drop policy if exists "Allow all reads for tastings" on public.tastings;
+drop policy if exists "Allow all writes for tastings" on public.tastings;
+drop policy if exists "Allow all updates for tastings" on public.tastings;
+drop policy if exists "Allow all deletes for tastings" on public.tastings;
+
+-- Remove current private policies before recreating them.
+drop policy if exists "Users can read own wines" on public.wines;
+drop policy if exists "Users can insert own wines" on public.wines;
+drop policy if exists "Users can update own wines" on public.wines;
+drop policy if exists "Users can delete own wines" on public.wines;
+
+drop policy if exists "Users can read own tastings" on public.tastings;
+drop policy if exists "Users can insert own tastings" on public.tastings;
+drop policy if exists "Users can update own tastings" on public.tastings;
+drop policy if exists "Users can delete own tastings" on public.tastings;
+
+create policy "Users can read own wines"
 on public.wines
 for select
-to anon
-using (true);
+to authenticated
+using (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);
 
-create policy "Allow all writes for wines"
+create policy "Users can insert own wines"
 on public.wines
 for insert
-to anon
-with check (true);
+to authenticated
+with check (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);
 
-create policy "Allow all updates for wines"
+create policy "Users can update own wines"
 on public.wines
 for update
-to anon
-using (true)
-with check (true);
+to authenticated
+using (
+  auth.uid() is not null
+  and auth.uid() = user_id
+)
+with check (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);
 
-create policy "Allow all deletes for wines"
+create policy "Users can delete own wines"
 on public.wines
 for delete
-to anon
-using (true);
+to authenticated
+using (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);
 
-create policy "Allow all reads for tastings"
+create policy "Users can read own tastings"
 on public.tastings
 for select
-to anon
-using (true);
+to authenticated
+using (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);
 
-create policy "Allow all writes for tastings"
+create policy "Users can insert own tastings"
 on public.tastings
 for insert
-to anon
-with check (true);
+to authenticated
+with check (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);
 
-create policy "Allow all updates for tastings"
+create policy "Users can update own tastings"
 on public.tastings
 for update
-to anon
-using (true)
-with check (true);
+to authenticated
+using (
+  auth.uid() is not null
+  and auth.uid() = user_id
+)
+with check (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);
 
-create policy "Allow all deletes for tastings"
+create policy "Users can delete own tastings"
 on public.tastings
 for delete
-to anon
-using (true);
+to authenticated
+using (
+  auth.uid() is not null
+  and auth.uid() = user_id
+);

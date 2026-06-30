@@ -17,6 +17,8 @@ Første version indeholder:
 - filtrering og sortering af kælder på årgang, område, drue og producent
 - automatisk nedskrivning af kælder ved egen flaske eller Coravin
 - manuel registrering af ekstern rating
+- Google-login via Supabase Auth
+- private vine og smagninger per bruger
 
 ## Lokal kørsel
 
@@ -32,15 +34,30 @@ Start appen:
 pnpm dev
 ```
 
+Lokal Supabase-opsætning ligger i `.env.local`:
+
+```text
+VITE_SUPABASE_URL=...
+VITE_SUPABASE_PUBLISHABLE_KEY=...
+```
+
 ## Supabase
 
-Databasen er ikke koblet på appen endnu. Første SQL-udkast ligger i:
+Databasen er ikke koblet på appen endnu. SQL-scriptet til første Supabase-version ligger i:
 
 ```text
 supabase/schema.sql
 ```
 
-Næste store tekniske trin er Supabase Auth, så appen kan deles med andre.
 Planen er ikke én separat database per bruger, men én fælles database hvor hver vin og
-smagning får et `user_id`. Supabase Row Level Security skal derefter sikre, at brugere
-kun kan se og ændre deres egne data.
+smagning får et `user_id`. Supabase Auth styrer login, og Row Level Security sikrer, at
+brugere kun kan se og ændre deres egne data.
+
+## Vercel environment variables
+
+Sæt disse i Vercel under Project -> Settings -> Environment Variables:
+
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+```
