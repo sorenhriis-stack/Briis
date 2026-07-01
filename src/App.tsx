@@ -410,8 +410,13 @@ const copy = {
     english: "English",
     danish: "Danish",
     signInTitle: "Sign in to Briis",
-    signInText: "Use Google login to save your cellar and tastings securely in Supabase.",
+    signInText: "Use Google or an email login link to save your cellar and tastings securely.",
     signInWithGoogle: "Sign in with Google",
+    orLoginWith: "Or",
+    emailLoginLabel: "Email",
+    emailLoginPlaceholder: "you@example.com",
+    signInWithEmail: "Send login link",
+    emailLoginSent: "Check your email for the login link.",
     signOut: "Sign out",
     signedInAs: "Signed in as",
     loadingAccount: "Checking login...",
@@ -512,8 +517,13 @@ const copy = {
     english: "Engelsk",
     danish: "Dansk",
     signInTitle: "Log ind på Briis",
-    signInText: "Brug Google-login til at gemme din kælder og dine smagninger sikkert i Supabase.",
+    signInText: "Brug Google eller et login-link på email til at gemme din kælder og dine smagninger sikkert.",
     signInWithGoogle: "Log ind med Google",
+    orLoginWith: "Eller",
+    emailLoginLabel: "Email",
+    emailLoginPlaceholder: "dig@example.com",
+    signInWithEmail: "Send login-link",
+    emailLoginSent: "Tjek din email for login-linket.",
     signOut: "Log ud",
     signedInAs: "Logget ind som",
     loadingAccount: "Tjekker login...",
@@ -736,6 +746,8 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [emailForLogin, setEmailForLogin] = useState("");
+  const [emailLoginSent, setEmailLoginSent] = useState(false);
   const [wines, setWines] = useState<WineRecord[]>([]);
   const [tastings, setTastings] = useState<TastingRecord[]>([]);
   const [customNoteOptions, setCustomNoteOptions] = useStoredState<CustomNotesByCategory>(
@@ -842,6 +854,37 @@ function App() {
     });
 
     if (error) setSyncError(error.message);
+  }
+
+  async function signInWithEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const client = supabase;
+    const email = emailForLogin.trim();
+
+    if (!client) {
+      setSyncError(t.missingSupabaseConfig);
+      return;
+    }
+
+    if (!email) return;
+
+    setSyncError(null);
+    setEmailLoginSent(false);
+
+    const { error } = await client.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      setSyncError(error.message);
+      return;
+    }
+
+    setEmailLoginSent(true);
   }
 
   async function signOut() {
@@ -1378,15 +1421,42 @@ function App() {
             <h2>{t.signInTitle}</h2>
             <p>{t.signInText}</p>
           </div>
-          <button
-            className="primaryButton"
-            disabled={!isSupabaseConfigured}
-            onClick={signInWithGoogle}
-            type="button"
-          >
-            <LogIn size={18} />
-            {t.signInWithGoogle}
-          </button>
+          <div className="authMethods">
+            <button
+              className="primaryButton"
+              disabled={!isSupabaseConfigured}
+              onClick={signInWithGoogle}
+              type="button"
+            >
+              <LogIn size={18} />
+              {t.signInWithGoogle}
+            </button>
+            <span className="authDivider">{t.orLoginWith}</span>
+            <form className="emailLoginForm" onSubmit={signInWithEmail}>
+              <label htmlFor="email-login">{t.emailLoginLabel}</label>
+              <div className="inlineFields">
+                <input
+                  autoComplete="email"
+                  id="email-login"
+                  onChange={(event) => {
+                    setEmailForLogin(event.target.value);
+                    setEmailLoginSent(false);
+                  }}
+                  placeholder={t.emailLoginPlaceholder}
+                  type="email"
+                  value={emailForLogin}
+                />
+                <button
+                  className="secondaryButton"
+                  disabled={!isSupabaseConfigured || !emailForLogin.trim()}
+                  type="submit"
+                >
+                  {t.signInWithEmail}
+                </button>
+              </div>
+              {emailLoginSent && <p className="successText">{t.emailLoginSent}</p>}
+            </form>
+          </div>
         </section>
       )}
 

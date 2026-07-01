@@ -226,7 +226,46 @@ h3 {
 .loginPanel {
   align-items: center;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(280px, 360px);
+}
+
+.authMethods {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.authMethods > .primaryButton {
+  justify-self: stretch;
+  width: 100%;
+}
+
+.authDivider {
+  color: #6c635b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.emailLoginForm {
+  display: grid;
+  gap: 8px;
+}
+
+.emailLoginForm label {
+  color: #6c635b;
+  font-size: 0.8rem;
+}
+
+.emailLoginForm .secondaryButton {
+  white-space: nowrap;
+}
+
+.successText {
+  color: #173d33;
+  font-size: 0.86rem;
+  font-weight: 800;
+  margin-bottom: 0;
 }
 
 .accountPanel {
