@@ -50,6 +50,12 @@ create table if not exists public.tastings (
   guess_region text,
   guess_commune text,
   guess_producer text,
+  revealed_wine_name text,
+  revealed_producer text,
+  revealed_vintage integer,
+  revealed_grape text,
+  revealed_region text,
+  revealed_commune text,
   guess_score integer check (
     guess_score is null
     or guess_score between 0 and 100
@@ -63,6 +69,32 @@ add column if not exists user_id uuid references auth.users(id) on delete cascad
 
 alter table public.tastings
 add column if not exists user_id uuid references auth.users(id) on delete cascade default auth.uid();
+
+-- Add detailed revealed wine fields for tastings made outside the cellar.
+alter table public.tastings
+add column if not exists revealed_wine_name text;
+
+alter table public.tastings
+add column if not exists revealed_producer text;
+
+alter table public.tastings
+add column if not exists revealed_vintage integer;
+
+alter table public.tastings
+add column if not exists revealed_grape text;
+
+alter table public.tastings
+add column if not exists revealed_region text;
+
+alter table public.tastings
+add column if not exists revealed_commune text;
+
+update public.tastings
+set revealed_wine_name = wine_name_snapshot
+where revealed_wine_name is null
+  and wine_id is null
+  and wine_name_snapshot is not null
+  and wine_name_snapshot <> '';
 
 alter table public.wines
 alter column user_id set default auth.uid();

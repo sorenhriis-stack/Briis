@@ -586,6 +586,25 @@ input:disabled {
   padding-top: 16px;
 }
 
+.manualRevealPanel {
+  background: rgba(244, 238, 229, 0.72);
+  border: 1px solid rgba(55, 47, 39, 0.12);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+}
+
+.manualRevealPanel span,
+.fieldHint {
+  color: #6c635b;
+  font-size: 0.86rem;
+}
+
+.fieldHint {
+  margin-bottom: 0;
+}
+
 .ratingList {
   display: grid;
   gap: 12px;

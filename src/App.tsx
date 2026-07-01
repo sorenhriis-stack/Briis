@@ -49,6 +49,15 @@ type WineRecord = {
   createdAt: string;
 };
 
+type RevealedWineDetails = {
+  name: string;
+  producer: string;
+  vintage: number | null;
+  grape: string;
+  region: string;
+  commune: string;
+};
+
 type TastingRecord = {
   id: string;
   wineId: string | null;
@@ -70,6 +79,7 @@ type TastingRecord = {
     commune: string;
     producer: string;
   };
+  revealedWine: RevealedWineDetails;
   guessScore: number | null;
   tastingNotes?: string[];
 };
@@ -108,6 +118,12 @@ type DbTastingRow = {
   guess_region: string | null;
   guess_commune: string | null;
   guess_producer: string | null;
+  revealed_wine_name: string | null;
+  revealed_producer: string | null;
+  revealed_vintage: number | null;
+  revealed_grape: string | null;
+  revealed_region: string | null;
+  revealed_commune: string | null;
   guess_score: number | null;
   created_at: string;
 };
@@ -127,7 +143,12 @@ type WineForm = {
 
 type TastingForm = {
   wineId: string;
-  outsideWineName: string;
+  revealedWineName: string;
+  revealedProducer: string;
+  revealedVintage: string;
+  revealedGrape: string;
+  revealedRegion: string;
+  revealedCommune: string;
   source: TastingSource;
   rating: string;
   color: string;
@@ -177,7 +198,12 @@ const defaultWineForm: WineForm = {
 
 const defaultTastingForm: TastingForm = {
   wineId: "",
-  outsideWineName: "",
+  revealedWineName: "",
+  revealedProducer: "",
+  revealedVintage: "",
+  revealedGrape: "",
+  revealedRegion: "",
+  revealedCommune: "",
   source: "other",
   rating: "",
   color: "",
@@ -391,9 +417,14 @@ const copy = {
     revealAndCellar: "Reveal and cellar",
     fillWhenRevealed: "Fill in when the wine is revealed",
     revealedWine: "Revealed wine",
+    revealedWineFromCellar: "Wine from cellar",
     notChosenYet: "Not chosen yet",
-    outsideWineName: "Name if not in cellar",
-    outsideWinePlaceholder: "Restaurant, friend, tasting...",
+    manualRevealedWine: "Manual revealed wine",
+    manualRevealedWineHelp: "Use this for restaurant, friend or tasting wines.",
+    revealedWineName: "Wine name",
+    revealedWinePlaceholder: "Restaurant, friend, tasting...",
+    revealedWineDetailsLabel: "Revealed details",
+    cellarWineLocksManualFields: "Chosen from cellar",
     bottleType: "Bottle type",
     saveChanges: "Save changes",
     saveTasting: "Save tasting",
@@ -498,9 +529,14 @@ const copy = {
     revealAndCellar: "Facit og kælder",
     fillWhenRevealed: "Udfyld når vinen er afsløret",
     revealedWine: "Facitvin",
+    revealedWineFromCellar: "Vin fra kælder",
     notChosenYet: "Ikke valgt endnu",
-    outsideWineName: "Navn hvis ikke i kælder",
-    outsideWinePlaceholder: "Restaurant, ven, smagning...",
+    manualRevealedWine: "Manuel facitvin",
+    manualRevealedWineHelp: "Brug dette til restaurant, ven eller smagning.",
+    revealedWineName: "Vinens navn",
+    revealedWinePlaceholder: "Restaurant, ven, smagning...",
+    revealedWineDetailsLabel: "Facitdetaljer",
+    cellarWineLocksManualFields: "Valgt fra kælder",
     bottleType: "Flasketype",
     saveChanges: "Gem ændringer",
     saveTasting: "Gem smagning",
@@ -579,21 +615,71 @@ function compareText(guess: string, actual: string) {
 
 function calculateGuessScore(
   guesses: TastingRecord["guesses"],
-  wine: WineRecord | undefined,
+  revealedWine: RevealedWineDetails | undefined,
 ) {
-  if (!wine) return null;
+  if (
+    !revealedWine ||
+    ![
+      revealedWine.vintage,
+      revealedWine.grape,
+      revealedWine.region,
+      revealedWine.commune,
+      revealedWine.producer,
+    ].some(Boolean)
+  ) {
+    return null;
+  }
 
   let score = 0;
-  if (guesses.vintage && wine.vintage) {
-    if (guesses.vintage === wine.vintage) score += 20;
-    else if (Math.abs(guesses.vintage - wine.vintage) === 1) score += 10;
+  if (guesses.vintage && revealedWine.vintage) {
+    if (guesses.vintage === revealedWine.vintage) score += 20;
+    else if (Math.abs(guesses.vintage - revealedWine.vintage) === 1) score += 10;
   }
-  if (compareText(guesses.grape, wine.grape)) score += 20;
-  if (compareText(guesses.region, wine.region)) score += 20;
-  if (compareText(guesses.commune, wine.commune)) score += 20;
-  if (compareText(guesses.producer, wine.producer)) score += 20;
+  if (guesses.grape && revealedWine.grape && compareText(guesses.grape, revealedWine.grape)) {
+    score += 20;
+  }
+  if (guesses.region && revealedWine.region && compareText(guesses.region, revealedWine.region)) {
+    score += 20;
+  }
+  if (
+    guesses.commune &&
+    revealedWine.commune &&
+    compareText(guesses.commune, revealedWine.commune)
+  ) {
+    score += 20;
+  }
+  if (
+    guesses.producer &&
+    revealedWine.producer &&
+    compareText(guesses.producer, revealedWine.producer)
+  ) {
+    score += 20;
+  }
 
   return score;
+}
+
+function wineToRevealedDetails(wine: WineRecord): RevealedWineDetails {
+  return {
+    name: wine.name,
+    producer: wine.producer,
+    vintage: wine.vintage,
+    grape: wine.grape,
+    region: wine.region,
+    commune: wine.commune,
+  };
+}
+
+function formatRevealedDetails(revealedWine: RevealedWineDetails) {
+  return [
+    revealedWine.vintage,
+    revealedWine.grape,
+    revealedWine.region,
+    revealedWine.commune,
+    revealedWine.producer,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function average(numbers: Array<number | null | undefined>) {
@@ -707,6 +793,14 @@ function dbTastingToRecord(row: DbTastingRow): TastingRecord {
       commune: row.guess_commune ?? "",
       producer: row.guess_producer ?? "",
     },
+    revealedWine: {
+      name: row.revealed_wine_name ?? row.wine_name_snapshot ?? "",
+      producer: row.revealed_producer ?? "",
+      vintage: row.revealed_vintage,
+      grape: row.revealed_grape ?? "",
+      region: row.revealed_region ?? "",
+      commune: row.revealed_commune ?? "",
+    },
     guessScore: row.guess_score,
   };
 }
@@ -731,6 +825,12 @@ function tastingToDbRow(tasting: TastingRecord) {
     guess_region: tasting.guesses.region || null,
     guess_commune: tasting.guesses.commune || null,
     guess_producer: tasting.guesses.producer || null,
+    revealed_wine_name: tasting.revealedWine.name || null,
+    revealed_producer: tasting.revealedWine.producer || null,
+    revealed_vintage: tasting.revealedWine.vintage,
+    revealed_grape: tasting.revealedWine.grape || null,
+    revealed_region: tasting.revealedWine.region || null,
+    revealed_commune: tasting.revealedWine.commune || null,
     guess_score: tasting.guessScore,
   };
 }
@@ -997,6 +1097,25 @@ function App() {
     setTastingForm((current) => ({ ...current, [field]: value }));
   }
 
+  function selectRevealedWine(wineId: string) {
+    const selectedWine = wines.find((wine) => wine.id === wineId);
+
+    setTastingForm((current) => ({
+      ...current,
+      wineId,
+      ...(selectedWine
+        ? {
+            revealedWineName: selectedWine.name,
+            revealedProducer: selectedWine.producer,
+            revealedVintage: selectedWine.vintage?.toString() ?? "",
+            revealedGrape: selectedWine.grape,
+            revealedRegion: selectedWine.region,
+            revealedCommune: selectedWine.commune,
+          }
+        : {}),
+    }));
+  }
+
   function updateCellarFilter(field: keyof CellarFilters, value: string) {
     setCellarFilters((current) => ({ ...current, [field]: value }));
   }
@@ -1208,6 +1327,16 @@ function App() {
     }
 
     const selectedWine = wines.find((wine) => wine.id === tastingForm.wineId);
+    const revealedWine: RevealedWineDetails = selectedWine
+      ? wineToRevealedDetails(selectedWine)
+      : {
+          name: tastingForm.revealedWineName.trim(),
+          producer: tastingForm.revealedProducer.trim(),
+          vintage: parseOptionalNumber(tastingForm.revealedVintage),
+          grape: tastingForm.revealedGrape.trim(),
+          region: tastingForm.revealedRegion.trim(),
+          commune: tastingForm.revealedCommune.trim(),
+        };
     const guesses: TastingRecord["guesses"] = {
       vintage: parseOptionalNumber(tastingForm.guessVintage),
       grape: tastingForm.guessGrape.trim(),
@@ -1220,8 +1349,7 @@ function App() {
     const tasting: TastingRecord = {
       id: editingTastingId ?? createId(),
       wineId: selectedWine?.id ?? null,
-      wineNameSnapshot:
-        selectedWine?.name || tastingForm.outsideWineName.trim() || t.untitledTasting,
+      wineNameSnapshot: selectedWine?.name || revealedWine.name || t.untitledTasting,
       tastedAt: editingTastingId
         ? tastings.find((item) => item.id === editingTastingId)?.tastedAt ??
           new Date().toISOString().slice(0, 10)
@@ -1239,7 +1367,8 @@ function App() {
       tannin: tastingForm.tannin,
       customNote: tastingForm.customNote.trim(),
       guesses,
-      guessScore: calculateGuessScore(guesses, selectedWine),
+      revealedWine,
+      guessScore: calculateGuessScore(guesses, revealedWine),
     };
 
     const previousTasting = tastings.find((item) => item.id === editingTastingId);
@@ -1299,7 +1428,12 @@ function App() {
     setEditingTastingId(tasting.id);
     setTastingForm({
       wineId: tasting.wineId ?? "",
-      outsideWineName: tasting.wineId ? "" : tasting.wineNameSnapshot,
+      revealedWineName: tasting.revealedWine.name || tasting.wineNameSnapshot,
+      revealedProducer: tasting.revealedWine.producer,
+      revealedVintage: tasting.revealedWine.vintage?.toString() ?? "",
+      revealedGrape: tasting.revealedWine.grape,
+      revealedRegion: tasting.revealedWine.region,
+      revealedCommune: tasting.revealedWine.commune,
       source: tasting.source,
       rating: tasting.rating?.toString() ?? "",
       color: tasting.color ?? "",
@@ -2084,10 +2218,10 @@ function App() {
               </div>
               <div className="formGrid">
                 <label>
-                  {t.revealedWine}
+                  {t.revealedWineFromCellar}
                   <select
                     value={tastingForm.wineId}
-                    onChange={(event) => updateTastingForm("wineId", event.target.value)}
+                    onChange={(event) => selectRevealedWine(event.target.value)}
                   >
                     <option value="">{t.notChosenYet}</option>
                     {wines.map((wine) => (
@@ -2098,17 +2232,6 @@ function App() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label>
-                  {t.outsideWineName}
-                  <input
-                    disabled={Boolean(tastingForm.wineId)}
-                    value={tastingForm.outsideWineName}
-                    onChange={(event) =>
-                      updateTastingForm("outsideWineName", event.target.value)
-                    }
-                    placeholder={t.outsideWinePlaceholder}
-                  />
                 </label>
                 <label>
                   {t.bottleType}
@@ -2123,6 +2246,84 @@ function App() {
                     <option value="coravin">{sourceLabels.coravin[language]}</option>
                   </select>
                 </label>
+              </div>
+              <div className="manualRevealPanel">
+                <div>
+                  <p className="eyebrow">{t.manualRevealedWine}</p>
+                  <span>{t.manualRevealedWineHelp}</span>
+                </div>
+                <div className="formGrid">
+                  <label>
+                    {t.revealedWineName}
+                    <input
+                      disabled={Boolean(tastingForm.wineId)}
+                      value={tastingForm.revealedWineName}
+                      onChange={(event) =>
+                        updateTastingForm("revealedWineName", event.target.value)
+                      }
+                      placeholder={t.revealedWinePlaceholder}
+                    />
+                  </label>
+                  <label>
+                    {t.producer}
+                    <input
+                      disabled={Boolean(tastingForm.wineId)}
+                      value={tastingForm.revealedProducer}
+                      onChange={(event) =>
+                        updateTastingForm("revealedProducer", event.target.value)
+                      }
+                      placeholder={t.producer}
+                    />
+                  </label>
+                  <label>
+                    {t.vintage}
+                    <input
+                      disabled={Boolean(tastingForm.wineId)}
+                      inputMode="numeric"
+                      value={tastingForm.revealedVintage}
+                      onChange={(event) =>
+                        updateTastingForm("revealedVintage", event.target.value)
+                      }
+                      placeholder="2019"
+                    />
+                  </label>
+                  <label>
+                    {t.grape}
+                    <input
+                      disabled={Boolean(tastingForm.wineId)}
+                      value={tastingForm.revealedGrape}
+                      onChange={(event) =>
+                        updateTastingForm("revealedGrape", event.target.value)
+                      }
+                      placeholder="Nebbiolo"
+                    />
+                  </label>
+                  <label>
+                    {t.region}
+                    <input
+                      disabled={Boolean(tastingForm.wineId)}
+                      value={tastingForm.revealedRegion}
+                      onChange={(event) =>
+                        updateTastingForm("revealedRegion", event.target.value)
+                      }
+                      placeholder="Piemonte"
+                    />
+                  </label>
+                  <label>
+                    {t.commune}
+                    <input
+                      disabled={Boolean(tastingForm.wineId)}
+                      value={tastingForm.revealedCommune}
+                      onChange={(event) =>
+                        updateTastingForm("revealedCommune", event.target.value)
+                      }
+                      placeholder="Barolo"
+                    />
+                  </label>
+                </div>
+                {tastingForm.wineId && (
+                  <p className="fieldHint">{t.cellarWineLocksManualFields}</p>
+                )}
               </div>
             </div>
 
@@ -2160,6 +2361,12 @@ function App() {
                     {sourceLabels[tasting.source][language]}
                   </p>
                   <h3>{tasting.wineNameSnapshot}</h3>
+                  {formatRevealedDetails(tasting.revealedWine) && (
+                    <p>
+                      {t.revealedWineDetailsLabel}:{" "}
+                      {formatRevealedDetails(tasting.revealedWine)}
+                    </p>
+                  )}
                   <p>
                     {[
                       tasting.color ? displayColor(tasting.color, language) : "",
