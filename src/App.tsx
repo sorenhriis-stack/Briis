@@ -94,6 +94,13 @@ type ProfileRecord = {
   updatedAt: string;
 };
 
+type FriendRecord = {
+  userId: string;
+  displayName: string;
+  friendCode: string;
+  createdAt: string;
+};
+
 type DbWineRow = {
   id: string;
   name: string;
@@ -144,6 +151,13 @@ type DbProfileRow = {
   friend_code: string;
   created_at: string;
   updated_at: string | null;
+};
+
+type DbFriendRow = {
+  friend_user_id: string;
+  display_name: string | null;
+  friend_code: string;
+  created_at: string;
 };
 
 type WineForm = {
@@ -490,6 +504,15 @@ const copy = {
     communityFoundation: "Community foundation",
     communityFoundationText:
       "This is the first small step toward friends and shared ratings. Only you can see and edit your profile for now.",
+    friends: "Friends",
+    addFriend: "Add friend",
+    addFriendHelp: "Enter a friend's Briis code to connect.",
+    friendCodeToAdd: "Friend code",
+    friendCodePlaceholder: "BRIIS-ABC123",
+    addFriendButton: "Add friend",
+    friendAdded: "Friend added.",
+    cannotAddYourself: "That is your own friend code.",
+    noFriends: "No friends added yet.",
   },
   da: {
     overviewLabel: "Briis overblik",
@@ -615,6 +638,15 @@ const copy = {
     communityFoundation: "Community-fundament",
     communityFoundationText:
       "Dette er første lille trin mod venner og delte ratings. Kun du kan se og redigere din profil lige nu.",
+    friends: "Venner",
+    addFriend: "Tilføj ven",
+    addFriendHelp: "Indtast en vens Briis-kode for at forbinde.",
+    friendCodeToAdd: "Vennekode",
+    friendCodePlaceholder: "BRIIS-ABC123",
+    addFriendButton: "Tilføj ven",
+    friendAdded: "Ven tilføjet.",
+    cannotAddYourself: "Det er din egen vennekode.",
+    noFriends: "Ingen venner tilføjet endnu.",
   },
 };
 
@@ -899,6 +931,15 @@ function dbProfileToRecord(row: DbProfileRow): ProfileRecord {
   };
 }
 
+function dbFriendToRecord(row: DbFriendRow): FriendRecord {
+  return {
+    userId: row.friend_user_id,
+    displayName: row.display_name ?? "",
+    friendCode: row.friend_code,
+    createdAt: row.created_at,
+  };
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
@@ -918,6 +959,9 @@ function App() {
   const [profileName, setProfileName] = useState("");
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [friendCodeCopied, setFriendCodeCopied] = useState(false);
+  const [friends, setFriends] = useState<FriendRecord[]>([]);
+  const [friendCodeToAdd, setFriendCodeToAdd] = useState("");
+  const [friendMessage, setFriendMessage] = useState<string | null>(null);
   const [customNoteOptions, setCustomNoteOptions] = useStoredState<CustomNotesByCategory>(
     "briis.customNotesByCategory",
     {},
@@ -977,6 +1021,9 @@ function App() {
       setProfileName("");
       setProfileMessage(null);
       setFriendCodeCopied(false);
+      setFriends([]);
+      setFriendCodeToAdd("");
+      setFriendMessage(null);
       setDataLoading(false);
       return;
     }
@@ -990,17 +1037,20 @@ function App() {
 
     setDataLoading(true);
     setSyncError(null);
+    setFriendMessage(null);
 
     try {
-      const [wineResult, tastingResult, profileResult] = await Promise.all([
+      const [wineResult, tastingResult, profileResult, friendResult] = await Promise.all([
         client.from("wines").select("*").order("created_at", { ascending: false }),
         client.from("tastings").select("*").order("created_at", { ascending: false }),
         client.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
+        client.rpc("list_friends"),
       ]);
 
       if (wineResult.error) throw wineResult.error;
       if (tastingResult.error) throw tastingResult.error;
       if (profileResult.error) throw profileResult.error;
+      if (friendResult.error) throw friendResult.error;
 
       setWines((wineResult.data ?? []).map((row) => dbWineToRecord(row as DbWineRow)));
       setTastings(
@@ -1013,6 +1063,7 @@ function App() {
 
       setProfile(profileRecord);
       setProfileName(profileRecord.displayName);
+      setFriends(((friendResult.data ?? []) as DbFriendRow[]).map(dbFriendToRecord));
     } catch (error) {
       setSyncError(getErrorMessage(error));
     } finally {
@@ -1629,6 +1680,45 @@ function App() {
     try {
       await navigator.clipboard.writeText(profile.friendCode);
       setFriendCodeCopied(true);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    }
+  }
+
+  async function addFriend(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const client = supabase;
+    const code = friendCodeToAdd.trim().toUpperCase();
+
+    if (!client || !session || !profile) return;
+    if (!code) return;
+
+    setSyncError(null);
+    setFriendMessage(null);
+
+    if (code === profile.friendCode.toUpperCase()) {
+      setFriendMessage(t.cannotAddYourself);
+      return;
+    }
+
+    try {
+      const { data, error } = await client.rpc("add_friend_by_code", {
+        input_friend_code: code,
+      });
+
+      if (error) throw error;
+
+      const nextFriends = ((data ?? []) as DbFriendRow[]).map(dbFriendToRecord);
+      setFriends((current) => {
+        const byUserId = new Map(current.map((friend) => [friend.userId, friend]));
+        nextFriends.forEach((friend) => byUserId.set(friend.userId, friend));
+        return Array.from(byUserId.values()).sort((a, b) =>
+          b.createdAt.localeCompare(a.createdAt),
+        );
+      });
+      setFriendCodeToAdd("");
+      setFriendMessage(t.friendAdded);
     } catch (error) {
       setSyncError(getErrorMessage(error));
     }
@@ -2622,6 +2712,48 @@ function App() {
                 <Copy size={17} />
                 {friendCodeCopied ? t.copied : t.copyCode}
               </button>
+            </section>
+
+            <section className="panelForm friendsPanel">
+              <div>
+                <p className="eyebrow">{t.friends}</p>
+                <h2>{t.addFriend}</h2>
+                <p>{t.addFriendHelp}</p>
+              </div>
+              <form className="addFriendForm" onSubmit={addFriend}>
+                <label>
+                  {t.friendCodeToAdd}
+                  <input
+                    value={friendCodeToAdd}
+                    onChange={(event) => {
+                      setFriendCodeToAdd(event.target.value.toUpperCase());
+                      setFriendMessage(null);
+                    }}
+                    placeholder={t.friendCodePlaceholder}
+                  />
+                </label>
+                <button
+                  className="secondaryButton"
+                  disabled={!profile || !friendCodeToAdd.trim()}
+                  type="submit"
+                >
+                  <UserRound size={17} />
+                  {t.addFriendButton}
+                </button>
+              </form>
+              {friendMessage && <p className="successText">{friendMessage}</p>}
+              <div className="friendList">
+                {friends.length === 0 && <p className="fieldHint">{t.noFriends}</p>}
+                {friends.map((friend) => (
+                  <div className="friendRow" key={friend.userId}>
+                    <UserRound size={20} />
+                    <div>
+                      <h3>{friend.displayName || friend.friendCode}</h3>
+                      <p>{friend.friendCode}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </section>
           </div>
         </section>

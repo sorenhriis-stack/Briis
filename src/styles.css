@@ -626,6 +626,50 @@ input:disabled {
   margin-bottom: 0;
 }
 
+.friendsPanel {
+  grid-column: 1 / -1;
+}
+
+.friendsPanel > div > p {
+  color: #6c635b;
+  margin-bottom: 0;
+}
+
+.addFriendForm {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.friendList {
+  border-top: 1px solid rgba(55, 47, 39, 0.12);
+  display: grid;
+  gap: 0;
+}
+
+.friendRow {
+  align-items: center;
+  border-bottom: 1px solid rgba(55, 47, 39, 0.12);
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.friendRow > svg {
+  color: #7a1739;
+  flex: 0 0 auto;
+}
+
+.friendRow h3 {
+  margin-bottom: 2px;
+}
+
+.friendRow p {
+  color: #6c635b;
+  margin-bottom: 0;
+}
+
 .ratingList {
   display: grid;
   gap: 12px;
@@ -777,6 +821,10 @@ input:disabled {
   }
 
   .inlineFields {
+    grid-template-columns: 1fr;
+  }
+
+  .addFriendForm {
     grid-template-columns: 1fr;
   }
 
