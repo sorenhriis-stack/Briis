@@ -395,11 +395,11 @@ begin
 
   insert into public.friendships (user_id, friend_user_id)
   values (current_user_id, target_profile.user_id)
-  on conflict (user_id, friend_user_id) do nothing;
+  on conflict do nothing;
 
   insert into public.friendships (user_id, friend_user_id)
   values (target_profile.user_id, current_user_id)
-  on conflict (user_id, friend_user_id) do nothing;
+  on conflict do nothing;
 
   return query
   select
