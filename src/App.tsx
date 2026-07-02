@@ -512,6 +512,7 @@ const copy = {
     addFriendButton: "Add friend",
     friendAdded: "Friend added.",
     cannotAddYourself: "That is your own friend code.",
+    friendCodeNotFound: "Friend code not found.",
     noFriends: "No friends added yet.",
   },
   da: {
@@ -646,6 +647,7 @@ const copy = {
     addFriendButton: "Tilføj ven",
     friendAdded: "Ven tilføjet.",
     cannotAddYourself: "Det er din egen vennekode.",
+    friendCodeNotFound: "Vennekoden blev ikke fundet.",
     noFriends: "Ingen venner tilføjet endnu.",
   },
 };
@@ -941,7 +943,32 @@ function dbFriendToRecord(row: DbFriendRow): FriendRecord {
 }
 
 function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Unknown error";
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error) return error;
+
+  if (error && typeof error === "object") {
+    const errorLike = error as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+    const parts = [errorLike.message, errorLike.details, errorLike.hint]
+      .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+      .map((part) => part.trim());
+
+    if (parts.length > 0) return parts.join(" ");
+    if (typeof errorLike.code === "string") return errorLike.code;
+  }
+
+  return "Unknown error";
+}
+
+function friendlyFriendError(message: string, t: (typeof copy)[Language]) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("friend code not found")) return t.friendCodeNotFound;
+  if (normalized.includes("cannot add yourself")) return t.cannotAddYourself;
+  return message;
 }
 
 function App() {
@@ -1720,7 +1747,7 @@ function App() {
       setFriendCodeToAdd("");
       setFriendMessage(t.friendAdded);
     } catch (error) {
-      setSyncError(getErrorMessage(error));
+      setFriendMessage(friendlyFriendError(getErrorMessage(error), t));
     }
   }
 
