@@ -9,6 +9,7 @@ import {
   CircleMinus,
   CirclePlus,
   ClipboardList,
+  Copy,
   Edit3,
   Grape,
   LogIn,
@@ -18,12 +19,13 @@ import {
   SlidersHorizontal,
   Star,
   Trash2,
+  UserRound,
   X,
   Wine,
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./supabaseClient";
 
-type Tab = "cellar" | "add" | "tasting" | "ratings";
+type Tab = "cellar" | "add" | "tasting" | "ratings" | "profile";
 type Language = "en" | "da";
 type TastingSource = "own_bottle" | "coravin" | "other";
 type SortOption =
@@ -84,6 +86,14 @@ type TastingRecord = {
   tastingNotes?: string[];
 };
 
+type ProfileRecord = {
+  userId: string;
+  displayName: string;
+  friendCode: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type DbWineRow = {
   id: string;
   name: string;
@@ -126,6 +136,14 @@ type DbTastingRow = {
   revealed_commune: string | null;
   guess_score: number | null;
   created_at: string;
+};
+
+type DbProfileRow = {
+  user_id: string;
+  display_name: string | null;
+  friend_code: string;
+  created_at: string;
+  updated_at: string | null;
 };
 
 type WineForm = {
@@ -360,6 +378,7 @@ const copy = {
     addWine: "Add wine",
     tasting: "Tasting",
     ratings: "Ratings",
+    profile: "Profile",
     winesInStock: "Wines in stock",
     searchPlaceholder: "Search wine, grape or region",
     filtersLabel: "Cellar filters",
@@ -459,6 +478,18 @@ const copy = {
     draftTitle: "Draft-friendly",
     draftText: "You can save a tasting with only one field filled in, or with nothing but today's date.",
     untitledTasting: "Untitled tasting",
+    profileAndFriends: "Profile and friend code",
+    displayName: "Display name",
+    displayNamePlaceholder: "Your name",
+    saveProfile: "Save profile",
+    profileSaved: "Profile saved.",
+    friendCode: "Friend code",
+    friendCodeHelp: "Share this code later when a friend wants to connect with you.",
+    copyCode: "Copy code",
+    copied: "Copied",
+    communityFoundation: "Community foundation",
+    communityFoundationText:
+      "This is the first small step toward friends and shared ratings. Only you can see and edit your profile for now.",
   },
   da: {
     overviewLabel: "Briis overblik",
@@ -472,6 +503,7 @@ const copy = {
     addWine: "Tilføj vin",
     tasting: "Smagning",
     ratings: "Ratings",
+    profile: "Profil",
     winesInStock: "Vine på lager",
     searchPlaceholder: "Søg vin, drue eller område",
     filtersLabel: "Kælderfiltre",
@@ -571,6 +603,18 @@ const copy = {
     draftTitle: "Kladdevenlig",
     draftText: "Du kan gemme en smagning med kun ét udfyldt felt, eller helt uden andet end datoen.",
     untitledTasting: "Smagning uden titel",
+    profileAndFriends: "Profil og vennekode",
+    displayName: "Visningsnavn",
+    displayNamePlaceholder: "Dit navn",
+    saveProfile: "Gem profil",
+    profileSaved: "Profil gemt.",
+    friendCode: "Vennekode",
+    friendCodeHelp: "Del denne kode senere, når en ven skal forbinde med dig.",
+    copyCode: "Kopiér kode",
+    copied: "Kopieret",
+    communityFoundation: "Community-fundament",
+    communityFoundationText:
+      "Dette er første lille trin mod venner og delte ratings. Kun du kan se og redigere din profil lige nu.",
   },
 };
 
@@ -595,6 +639,16 @@ function useStoredState<T>(key: string, fallback: T) {
 
 function createId() {
   return crypto.randomUUID();
+}
+
+function createFriendCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const values = new Uint32Array(6);
+  crypto.getRandomValues(values);
+
+  return `BRIIS-${Array.from(values)
+    .map((value) => alphabet[value % alphabet.length])
+    .join("")}`;
 }
 
 function parseOptionalNumber(value: string) {
@@ -835,6 +889,16 @@ function tastingToDbRow(tasting: TastingRecord) {
   };
 }
 
+function dbProfileToRecord(row: DbProfileRow): ProfileRecord {
+  return {
+    userId: row.user_id,
+    displayName: row.display_name ?? "",
+    friendCode: row.friend_code,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
+  };
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown error";
 }
@@ -850,6 +914,10 @@ function App() {
   const [emailLoginSent, setEmailLoginSent] = useState(false);
   const [wines, setWines] = useState<WineRecord[]>([]);
   const [tastings, setTastings] = useState<TastingRecord[]>([]);
+  const [profile, setProfile] = useState<ProfileRecord | null>(null);
+  const [profileName, setProfileName] = useState("");
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [friendCodeCopied, setFriendCodeCopied] = useState(false);
   const [customNoteOptions, setCustomNoteOptions] = useStoredState<CustomNotesByCategory>(
     "briis.customNotesByCategory",
     {},
@@ -905,6 +973,10 @@ function App() {
     if (!session) {
       setWines([]);
       setTastings([]);
+      setProfile(null);
+      setProfileName("");
+      setProfileMessage(null);
+      setFriendCodeCopied(false);
       setDataLoading(false);
       return;
     }
@@ -920,23 +992,59 @@ function App() {
     setSyncError(null);
 
     try {
-      const [wineResult, tastingResult] = await Promise.all([
+      const [wineResult, tastingResult, profileResult] = await Promise.all([
         client.from("wines").select("*").order("created_at", { ascending: false }),
         client.from("tastings").select("*").order("created_at", { ascending: false }),
+        client.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
       ]);
 
       if (wineResult.error) throw wineResult.error;
       if (tastingResult.error) throw tastingResult.error;
+      if (profileResult.error) throw profileResult.error;
 
       setWines((wineResult.data ?? []).map((row) => dbWineToRecord(row as DbWineRow)));
       setTastings(
         (tastingResult.data ?? []).map((row) => dbTastingToRecord(row as DbTastingRow)),
       );
+
+      const profileRecord = profileResult.data
+        ? dbProfileToRecord(profileResult.data as DbProfileRow)
+        : await createProfile();
+
+      setProfile(profileRecord);
+      setProfileName(profileRecord.displayName);
     } catch (error) {
       setSyncError(getErrorMessage(error));
     } finally {
       setDataLoading(false);
     }
+  }
+
+  async function createProfile() {
+    const client = supabase;
+    if (!client || !session) throw new Error(t.missingSupabaseConfig);
+
+    const defaultName =
+      typeof session.user.user_metadata.full_name === "string"
+        ? session.user.user_metadata.full_name
+        : session.user.email?.split("@")[0] ?? "";
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const { data, error } = await client
+        .from("profiles")
+        .insert({
+          user_id: session.user.id,
+          display_name: defaultName,
+          friend_code: createFriendCode(),
+        })
+        .select("*")
+        .single();
+
+      if (!error) return dbProfileToRecord(data as DbProfileRow);
+      if (error.code !== "23505") throw error;
+    }
+
+    throw new Error("Could not create a unique friend code.");
   }
 
   async function signInWithGoogle() {
@@ -1484,6 +1592,48 @@ function App() {
     }
   }
 
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const client = supabase;
+    if (!client || !session || !profile) return;
+
+    setSyncError(null);
+    setProfileMessage(null);
+
+    try {
+      const { data, error } = await client
+        .from("profiles")
+        .update({
+          display_name: profileName.trim(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", profile.userId)
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      const savedProfile = dbProfileToRecord(data as DbProfileRow);
+      setProfile(savedProfile);
+      setProfileName(savedProfile.displayName);
+      setProfileMessage(t.profileSaved);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    }
+  }
+
+  async function copyFriendCode() {
+    if (!profile) return;
+
+    try {
+      await navigator.clipboard.writeText(profile.friendCode);
+      setFriendCodeCopied(true);
+    } catch (error) {
+      setSyncError(getErrorMessage(error));
+    }
+  }
+
   function getWineRating(wineId: string) {
     return ratingByWine.find((rating) => rating.wineId === wineId);
   }
@@ -1652,6 +1802,14 @@ function App() {
         >
           <BarChart3 size={18} />
           {t.ratings}
+        </button>
+        <button
+          className={activeTab === "profile" ? "active" : ""}
+          onClick={() => setActiveTab("profile")}
+          type="button"
+        >
+          <UserRound size={18} />
+          {t.profile}
         </button>
       </nav>
 
@@ -2412,6 +2570,59 @@ function App() {
                 </div>
               </article>
             ))}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "profile" && (
+        <section className="formLayout">
+          <div className="sectionHeader">
+            <div>
+              <p className="eyebrow">{t.profile}</p>
+              <h2>{t.profileAndFriends}</h2>
+            </div>
+          </div>
+
+          <div className="profileGrid">
+            <form className="panelForm" onSubmit={saveProfile}>
+              <div className="draftNotice">
+                <strong>{t.communityFoundation}</strong>
+                <span>{t.communityFoundationText}</span>
+              </div>
+              <label>
+                {t.displayName}
+                <input
+                  value={profileName}
+                  onChange={(event) => {
+                    setProfileName(event.target.value);
+                    setProfileMessage(null);
+                  }}
+                  placeholder={t.displayNamePlaceholder}
+                />
+              </label>
+              <button className="primaryButton" disabled={!profile} type="submit">
+                <Check size={18} />
+                {t.saveProfile}
+              </button>
+              {profileMessage && <p className="successText">{profileMessage}</p>}
+            </form>
+
+            <section className="panelForm friendCodePanel">
+              <div>
+                <p className="eyebrow">{t.friendCode}</p>
+                <h2>{profile?.friendCode ?? "-"}</h2>
+              </div>
+              <p>{t.friendCodeHelp}</p>
+              <button
+                className="ghostButton"
+                disabled={!profile}
+                onClick={copyFriendCode}
+                type="button"
+              >
+                <Copy size={17} />
+                {friendCodeCopied ? t.copied : t.copyCode}
+              </button>
+            </section>
           </div>
         </section>
       )}

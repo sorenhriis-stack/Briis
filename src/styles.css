@@ -173,7 +173,7 @@ h3 {
   border-radius: 8px;
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   margin-bottom: 24px;
   padding: 6px;
   position: sticky;
@@ -605,6 +605,27 @@ input:disabled {
   margin-bottom: 0;
 }
 
+.profileGrid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+}
+
+.friendCodePanel {
+  align-content: start;
+}
+
+.friendCodePanel h2 {
+  color: #173d33;
+  font-size: 2rem;
+  letter-spacing: 0;
+}
+
+.friendCodePanel p {
+  color: #6c635b;
+  margin-bottom: 0;
+}
+
 .ratingList {
   display: grid;
   gap: 12px;
@@ -707,7 +728,8 @@ input:disabled {
   .loginPanel,
   .filterPanel,
   .wineGrid,
-  .formGrid {
+  .formGrid,
+  .profileGrid {
     grid-template-columns: 1fr;
   }
 
