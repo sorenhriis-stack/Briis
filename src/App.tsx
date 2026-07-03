@@ -2736,6 +2736,29 @@ function App() {
               </article>
             ))}
           </div>
+
+          <section className="panelForm friendRatingsPanel">
+            <div>
+              <p className="eyebrow">{t.friends}</p>
+              <h2>{t.friendsRatings}</h2>
+              <p>{t.friendsRatingsHelp}</p>
+            </div>
+            <div className="friendRatingList">
+              {friendRatings.length === 0 && <p className="fieldHint">{t.noFriendRatings}</p>}
+              {friendRatings.map((friendRating) => (
+                <article className="friendRatingRow" key={friendRating.tastingId}>
+                  <div className="scoreBadge">{friendRating.rating ?? "-"}</div>
+                  <div>
+                    <p className="wineMeta">
+                      {new Date(friendRating.tastedAt).toLocaleDateString("da-DK")} ·{" "}
+                      {t.ratedBy} {friendRating.friendName || "-"}
+                    </p>
+                    <h3>{friendRating.wineName}</h3>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         </section>
       )}
 
@@ -2831,28 +2854,6 @@ function App() {
               </div>
             </section>
 
-            <section className="panelForm friendRatingsPanel">
-              <div>
-                <p className="eyebrow">{t.friends}</p>
-                <h2>{t.friendsRatings}</h2>
-                <p>{t.friendsRatingsHelp}</p>
-              </div>
-              <div className="friendRatingList">
-                {friendRatings.length === 0 && <p className="fieldHint">{t.noFriendRatings}</p>}
-                {friendRatings.map((friendRating) => (
-                  <article className="friendRatingRow" key={friendRating.tastingId}>
-                    <div className="scoreBadge">{friendRating.rating ?? "-"}</div>
-                    <div>
-                      <p className="wineMeta">
-                        {new Date(friendRating.tastedAt).toLocaleDateString("da-DK")} ·{" "}
-                        {t.ratedBy} {friendRating.friendName || "-"}
-                      </p>
-                      <h3>{friendRating.wineName}</h3>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
           </div>
         </section>
       )}

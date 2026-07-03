@@ -673,6 +673,7 @@ input:disabled {
 
 .friendRatingsPanel {
   grid-column: 1 / -1;
+  margin-top: 6px;
 }
 
 .friendRatingList {
