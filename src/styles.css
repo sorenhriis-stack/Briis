@@ -630,7 +630,8 @@ input:disabled {
   grid-column: 1 / -1;
 }
 
-.friendsPanel > div > p {
+.friendsPanel > div > p,
+.friendRatingsPanel > div > p {
   color: #6c635b;
   margin-bottom: 0;
 }
@@ -668,6 +669,27 @@ input:disabled {
 .friendRow p {
   color: #6c635b;
   margin-bottom: 0;
+}
+
+.friendRatingsPanel {
+  grid-column: 1 / -1;
+}
+
+.friendRatingList {
+  display: grid;
+  gap: 10px;
+}
+
+.friendRatingRow {
+  align-items: center;
+  background: #fffdfa;
+  border: 1px solid rgba(55, 47, 39, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 58px minmax(0, 1fr);
+  min-height: 82px;
+  padding: 12px;
 }
 
 .ratingList {

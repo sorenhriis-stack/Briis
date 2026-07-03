@@ -101,6 +101,16 @@ type FriendRecord = {
   createdAt: string;
 };
 
+type FriendRatingRecord = {
+  tastingId: string;
+  friendUserId: string;
+  friendName: string;
+  wineName: string;
+  rating: number | null;
+  tastedAt: string;
+  createdAt: string;
+};
+
 type DbWineRow = {
   id: string;
   name: string;
@@ -157,6 +167,16 @@ type DbFriendRow = {
   friend_user_id: string;
   display_name: string | null;
   friend_code: string;
+  created_at: string;
+};
+
+type DbFriendRatingRow = {
+  tasting_id: string;
+  friend_user_id: string;
+  friend_name: string | null;
+  wine_name: string;
+  rating: number | null;
+  tasted_at: string;
   created_at: string;
 };
 
@@ -514,6 +534,10 @@ const copy = {
     cannotAddYourself: "That is your own friend code.",
     friendCodeNotFound: "Friend code not found.",
     noFriends: "No friends added yet.",
+    friendsRatings: "Friends' ratings",
+    friendsRatingsHelp: "See the newest ratings your friends have shared through Briis.",
+    noFriendRatings: "No friend ratings yet.",
+    ratedBy: "Rated by",
   },
   da: {
     overviewLabel: "Briis overblik",
@@ -649,6 +673,10 @@ const copy = {
     cannotAddYourself: "Det er din egen vennekode.",
     friendCodeNotFound: "Vennekoden blev ikke fundet.",
     noFriends: "Ingen venner tilføjet endnu.",
+    friendsRatings: "Venners ratings",
+    friendsRatingsHelp: "Se de nyeste ratings dine venner har delt gennem Briis.",
+    noFriendRatings: "Ingen ratings fra venner endnu.",
+    ratedBy: "Rated af",
   },
 };
 
@@ -942,6 +970,18 @@ function dbFriendToRecord(row: DbFriendRow): FriendRecord {
   };
 }
 
+function dbFriendRatingToRecord(row: DbFriendRatingRow): FriendRatingRecord {
+  return {
+    tastingId: row.tasting_id,
+    friendUserId: row.friend_user_id,
+    friendName: row.friend_name ?? "",
+    wineName: row.wine_name,
+    rating: row.rating,
+    tastedAt: row.tasted_at,
+    createdAt: row.created_at,
+  };
+}
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error) return error;
@@ -987,6 +1027,7 @@ function App() {
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [friendCodeCopied, setFriendCodeCopied] = useState(false);
   const [friends, setFriends] = useState<FriendRecord[]>([]);
+  const [friendRatings, setFriendRatings] = useState<FriendRatingRecord[]>([]);
   const [friendCodeToAdd, setFriendCodeToAdd] = useState("");
   const [friendMessage, setFriendMessage] = useState<string | null>(null);
   const [customNoteOptions, setCustomNoteOptions] = useStoredState<CustomNotesByCategory>(
@@ -1049,6 +1090,7 @@ function App() {
       setProfileMessage(null);
       setFriendCodeCopied(false);
       setFriends([]);
+      setFriendRatings([]);
       setFriendCodeToAdd("");
       setFriendMessage(null);
       setDataLoading(false);
@@ -1067,17 +1109,20 @@ function App() {
     setFriendMessage(null);
 
     try {
-      const [wineResult, tastingResult, profileResult, friendResult] = await Promise.all([
-        client.from("wines").select("*").order("created_at", { ascending: false }),
-        client.from("tastings").select("*").order("created_at", { ascending: false }),
-        client.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
-        client.rpc("list_friends"),
-      ]);
+      const [wineResult, tastingResult, profileResult, friendResult, friendRatingResult] =
+        await Promise.all([
+          client.from("wines").select("*").order("created_at", { ascending: false }),
+          client.from("tastings").select("*").order("created_at", { ascending: false }),
+          client.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
+          client.rpc("list_friends"),
+          client.rpc("list_friend_ratings"),
+        ]);
 
       if (wineResult.error) throw wineResult.error;
       if (tastingResult.error) throw tastingResult.error;
       if (profileResult.error) throw profileResult.error;
       if (friendResult.error) throw friendResult.error;
+      if (friendRatingResult.error) throw friendRatingResult.error;
 
       setWines((wineResult.data ?? []).map((row) => dbWineToRecord(row as DbWineRow)));
       setTastings(
@@ -1091,6 +1136,9 @@ function App() {
       setProfile(profileRecord);
       setProfileName(profileRecord.displayName);
       setFriends(((friendResult.data ?? []) as DbFriendRow[]).map(dbFriendToRecord));
+      setFriendRatings(
+        ((friendRatingResult.data ?? []) as DbFriendRatingRow[]).map(dbFriendRatingToRecord),
+      );
     } catch (error) {
       setSyncError(getErrorMessage(error));
     } finally {
@@ -2779,6 +2827,29 @@ function App() {
                       <p>{friend.friendCode}</p>
                     </div>
                   </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="panelForm friendRatingsPanel">
+              <div>
+                <p className="eyebrow">{t.friends}</p>
+                <h2>{t.friendsRatings}</h2>
+                <p>{t.friendsRatingsHelp}</p>
+              </div>
+              <div className="friendRatingList">
+                {friendRatings.length === 0 && <p className="fieldHint">{t.noFriendRatings}</p>}
+                {friendRatings.map((friendRating) => (
+                  <article className="friendRatingRow" key={friendRating.tastingId}>
+                    <div className="scoreBadge">{friendRating.rating ?? "-"}</div>
+                    <div>
+                      <p className="wineMeta">
+                        {new Date(friendRating.tastedAt).toLocaleDateString("da-DK")} ·{" "}
+                        {t.ratedBy} {friendRating.friendName || "-"}
+                      </p>
+                      <h3>{friendRating.wineName}</h3>
+                    </div>
+                  </article>
                 ))}
               </div>
             </section>
