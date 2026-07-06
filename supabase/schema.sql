@@ -414,6 +414,8 @@ begin
 end;
 $$;
 
+drop function if exists public.list_friend_ratings();
+
 create or replace function public.list_friend_ratings()
 returns table (
   tasting_id uuid,
@@ -428,6 +430,18 @@ returns table (
   structure_notes text[],
   acidity text,
   tannin text,
+  guess_vintage integer,
+  guess_grape text,
+  guess_region text,
+  guess_commune text,
+  guess_producer text,
+  revealed_wine_name text,
+  revealed_producer text,
+  revealed_vintage integer,
+  revealed_grape text,
+  revealed_region text,
+  revealed_commune text,
+  guess_score integer,
   created_at timestamptz
 )
 language plpgsql
@@ -453,6 +467,18 @@ begin
     t.structure_notes,
     t.acidity,
     t.tannin,
+    t.guess_vintage,
+    t.guess_grape,
+    t.guess_region,
+    t.guess_commune,
+    t.guess_producer,
+    t.revealed_wine_name,
+    t.revealed_producer,
+    t.revealed_vintage,
+    t.revealed_grape,
+    t.revealed_region,
+    t.revealed_commune,
+    t.guess_score,
     t.created_at
   from public.friendships f
   join public.tastings t on t.user_id = f.friend_user_id

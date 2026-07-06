@@ -731,6 +731,17 @@ input:disabled {
   margin-bottom: 0;
 }
 
+.friendRatingSharedBlock {
+  display: grid;
+  gap: 3px;
+  padding-top: 6px;
+}
+
+.friendRatingSharedBlock strong {
+  color: #173d33;
+  font-size: 0.9rem;
+}
+
 .ratingList {
   display: grid;
   gap: 12px;

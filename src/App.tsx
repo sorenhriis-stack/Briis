@@ -114,6 +114,9 @@ type FriendRatingRecord = {
   structureNotes: string[];
   acidity: string;
   tannin: string;
+  guesses: TastingRecord["guesses"];
+  revealedWine: RevealedWineDetails;
+  guessScore: number | null;
   createdAt: string;
 };
 
@@ -189,6 +192,18 @@ type DbFriendRatingRow = {
   structure_notes: string[] | null;
   acidity: string | null;
   tannin: string | null;
+  guess_vintage: number | null;
+  guess_grape: string | null;
+  guess_region: string | null;
+  guess_commune: string | null;
+  guess_producer: string | null;
+  revealed_wine_name: string | null;
+  revealed_producer: string | null;
+  revealed_vintage: number | null;
+  revealed_grape: string | null;
+  revealed_region: string | null;
+  revealed_commune: string | null;
+  guess_score: number | null;
   created_at: string;
 };
 
@@ -816,6 +831,12 @@ function formatRevealedDetails(revealedWine: RevealedWineDetails) {
     .join(" · ");
 }
 
+function formatGuessDetails(guesses: TastingRecord["guesses"]) {
+  return [guesses.vintage, guesses.grape, guesses.region, guesses.commune, guesses.producer]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function average(numbers: Array<number | null | undefined>) {
   const validNumbers = numbers.filter((number): number is number => typeof number === "number");
   if (validNumbers.length === 0) return null;
@@ -1002,6 +1023,22 @@ function dbFriendRatingToRecord(row: DbFriendRatingRow): FriendRatingRecord {
     structureNotes: row.structure_notes ?? [],
     acidity: row.acidity ?? "",
     tannin: row.tannin ?? "",
+    guesses: {
+      vintage: row.guess_vintage,
+      grape: row.guess_grape ?? "",
+      region: row.guess_region ?? "",
+      commune: row.guess_commune ?? "",
+      producer: row.guess_producer ?? "",
+    },
+    revealedWine: {
+      name: row.revealed_wine_name ?? "",
+      producer: row.revealed_producer ?? "",
+      vintage: row.revealed_vintage,
+      grape: row.revealed_grape ?? "",
+      region: row.revealed_region ?? "",
+      commune: row.revealed_commune ?? "",
+    },
+    guessScore: row.guess_score,
     createdAt: row.created_at,
   };
 }
@@ -2773,6 +2810,8 @@ function App() {
               {friendRatings.length === 0 && <p className="fieldHint">{t.noFriendRatings}</p>}
               {friendRatings.map((friendRating) => {
                 const isOpen = openFriendRatingId === friendRating.tastingId;
+                const friendGuessDetails = formatGuessDetails(friendRating.guesses);
+                const friendRevealedDetails = formatRevealedDetails(friendRating.revealedWine);
 
                 return (
                   <article className="friendRatingCard" key={friendRating.tastingId}>
@@ -2821,6 +2860,20 @@ function App() {
                               .join(" · ")}
                           </p>
                         )}
+                        <div className="friendRatingSharedBlock">
+                          <strong>{t.blindGuess}</strong>
+                          <p>{friendGuessDetails || "-"}</p>
+                        </div>
+                        <div className="friendRatingSharedBlock">
+                          <strong>{t.revealedWine}</strong>
+                          <p>{friendRating.revealedWine.name || t.notChosenYet}</p>
+                          {friendRevealedDetails && <p>{friendRevealedDetails}</p>}
+                          {friendRating.guessScore !== null && (
+                            <p>
+                              {t.guessScore}: {friendRating.guessScore}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                   </article>
