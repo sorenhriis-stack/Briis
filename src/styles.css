@@ -305,6 +305,36 @@ h3 {
   justify-content: space-between;
 }
 
+.ratingsHeader {
+  align-items: end;
+}
+
+.ratingViewToggle {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(55, 47, 39, 0.12);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 6px;
+  width: min(360px, 100%);
+}
+
+.ratingViewToggle button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: #4d463f;
+  font-weight: 800;
+  min-height: 40px;
+  padding: 9px 12px;
+}
+
+.ratingViewToggle button.active {
+  background: #7a1739;
+  color: #fff7ec;
+}
+
 .searchBox {
   align-items: center;
   background: #fffdfa;
@@ -672,8 +702,10 @@ input:disabled {
 }
 
 .friendRatingsPanel {
+  display: grid;
+  gap: 12px;
   grid-column: 1 / -1;
-  margin-top: 6px;
+  margin-top: 0;
 }
 
 .friendRatingList {
@@ -869,6 +901,10 @@ input:disabled {
   .sectionHeader {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .ratingViewToggle {
+    width: 100%;
   }
 
   .wineCard {

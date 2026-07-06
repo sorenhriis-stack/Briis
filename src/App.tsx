@@ -28,6 +28,7 @@ import { isSupabaseConfigured, supabase } from "./supabaseClient";
 type Tab = "cellar" | "add" | "tasting" | "ratings" | "profile";
 type Language = "en" | "da";
 type TastingSource = "own_bottle" | "coravin" | "other";
+type RatingsView = "mine" | "friends";
 type SortOption =
   | "vintage-desc"
   | "vintage-asc"
@@ -509,6 +510,8 @@ const copy = {
     saveChanges: "Save changes",
     saveTasting: "Save tasting",
     yourTastings: "Your tastings",
+    myRatings: "My ratings",
+    ratingsViewLabel: "Choose ratings view",
     noTastings: "No tastings yet.",
     guessScore: "guess score",
     edit: "Edit",
@@ -651,6 +654,8 @@ const copy = {
     saveChanges: "Gem ændringer",
     saveTasting: "Gem smagning",
     yourTastings: "Dine smagninger",
+    myRatings: "Mine ratings",
+    ratingsViewLabel: "Vælg ratingvisning",
     noTastings: "Ingen smagninger endnu.",
     guessScore: "gættescore",
     edit: "Rediger",
@@ -1090,6 +1095,7 @@ function App() {
   const [friends, setFriends] = useState<FriendRecord[]>([]);
   const [friendRatings, setFriendRatings] = useState<FriendRatingRecord[]>([]);
   const [openFriendRatingId, setOpenFriendRatingId] = useState<string | null>(null);
+  const [ratingsView, setRatingsView] = useState<RatingsView>("mine");
   const [friendCodeToAdd, setFriendCodeToAdd] = useState("");
   const [friendMessage, setFriendMessage] = useState<string | null>(null);
   const [customNoteOptions, setCustomNoteOptions] = useStoredState<CustomNotesByCategory>(
@@ -2723,164 +2729,189 @@ function App() {
 
       {activeTab === "ratings" && (
         <section className="viewStack">
-          <div className="sectionHeader">
+          <div className="sectionHeader ratingsHeader">
             <div>
               <p className="eyebrow">{t.ratings}</p>
-              <h2>{t.yourTastings}</h2>
+              <h2>{ratingsView === "mine" ? t.yourTastings : t.friendsRatings}</h2>
+            </div>
+            <div className="ratingViewToggle" role="tablist" aria-label={t.ratingsViewLabel}>
+              <button
+                aria-selected={ratingsView === "mine"}
+                className={ratingsView === "mine" ? "active" : ""}
+                onClick={() => setRatingsView("mine")}
+                role="tab"
+                type="button"
+              >
+                {t.myRatings}
+              </button>
+              <button
+                aria-selected={ratingsView === "friends"}
+                className={ratingsView === "friends" ? "active" : ""}
+                onClick={() => setRatingsView("friends")}
+                role="tab"
+                type="button"
+              >
+                {t.friendsRatings}
+              </button>
             </div>
           </div>
 
-          <div className="ratingList">
-            {tastings.length === 0 && (
-              <div className="emptyState">
-                <ClipboardList size={36} />
-                <p>{t.noTastings}</p>
-              </div>
-            )}
+          {ratingsView === "mine" && (
+            <div className="ratingList">
+              {tastings.length === 0 && (
+                <div className="emptyState">
+                  <ClipboardList size={36} />
+                  <p>{t.noTastings}</p>
+                </div>
+              )}
 
-            {tastings.map((tasting) => (
-              <article className="ratingRow" key={tasting.id}>
-                <div className="scoreBadge">{tasting.rating ?? "-"}</div>
-                <div>
-                  <p className="wineMeta">
-                    {new Date(tasting.tastedAt).toLocaleDateString("da-DK")} ·{" "}
-                    {sourceLabels[tasting.source][language]}
-                  </p>
-                  <h3>{tasting.wineNameSnapshot}</h3>
-                  {formatRevealedDetails(tasting.revealedWine) && (
-                    <p>
-                      {t.revealedWineDetailsLabel}:{" "}
-                      {formatRevealedDetails(tasting.revealedWine)}
+              {tastings.map((tasting) => (
+                <article className="ratingRow" key={tasting.id}>
+                  <div className="scoreBadge">{tasting.rating ?? "-"}</div>
+                  <div>
+                    <p className="wineMeta">
+                      {new Date(tasting.tastedAt).toLocaleDateString("da-DK")} ·{" "}
+                      {sourceLabels[tasting.source][language]}
                     </p>
-                  )}
-                  <p>
-                    {[
-                      tasting.color ? displayColor(tasting.color, language) : "",
-                      `${t.colorPrefixAcidity} ${tasting.acidity ?? "-"}`,
-                      `${t.colorPrefixTannin} ${tasting.tannin ?? "-"}`,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  <p>{t.noseLabel}: {displayNotes(tasting.noseNotes ?? [], language)}</p>
-                  <p>{t.palateLabel}: {displayNotes(safeNotes(tasting), language)}</p>
-                  {(tasting.structureNotes ?? []).length > 0 && (
+                    <h3>{tasting.wineNameSnapshot}</h3>
+                    {formatRevealedDetails(tasting.revealedWine) && (
+                      <p>
+                        {t.revealedWineDetailsLabel}:{" "}
+                        {formatRevealedDetails(tasting.revealedWine)}
+                      </p>
+                    )}
                     <p>
-                      {t.characterLabel}:{" "}
-                      {(tasting.structureNotes ?? [])
-                        .map((note) => displayStructure(note, language))
+                      {[
+                        tasting.color ? displayColor(tasting.color, language) : "",
+                        `${t.colorPrefixAcidity} ${tasting.acidity ?? "-"}`,
+                        `${t.colorPrefixTannin} ${tasting.tannin ?? "-"}`,
+                      ]
+                        .filter(Boolean)
                         .join(" · ")}
                     </p>
-                  )}
-                  {tasting.customNote && <p>{tasting.customNote}</p>}
-                </div>
-                <div className="ratingActions">
-                  <div className="guessScore">
-                    <span>{tasting.guessScore ?? "-"}</span>
-                    <p>{t.guessScore}</p>
+                    <p>{t.noseLabel}: {displayNotes(tasting.noseNotes ?? [], language)}</p>
+                    <p>{t.palateLabel}: {displayNotes(safeNotes(tasting), language)}</p>
+                    {(tasting.structureNotes ?? []).length > 0 && (
+                      <p>
+                        {t.characterLabel}:{" "}
+                        {(tasting.structureNotes ?? [])
+                          .map((note) => displayStructure(note, language))
+                          .join(" · ")}
+                      </p>
+                    )}
+                    {tasting.customNote && <p>{tasting.customNote}</p>}
                   </div>
-                  <button
-                    className="ghostButton compactButton"
-                    onClick={() => editTasting(tasting)}
-                    type="button"
-                  >
-                    <Edit3 size={17} />
-                    {t.edit}
-                  </button>
-                  <button
-                    className="ghostButton dangerButton compactButton"
-                    onClick={() => deleteTasting(tasting)}
-                    type="button"
-                  >
-                    <Trash2 size={17} />
-                    {t.deleteTasting}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <section className="panelForm friendRatingsPanel">
-            <div>
-              <p className="eyebrow">{t.friends}</p>
-              <h2>{t.friendsRatings}</h2>
-              <p>{t.friendsRatingsHelp}</p>
-            </div>
-            <div className="friendRatingList">
-              {friendRatings.length === 0 && <p className="fieldHint">{t.noFriendRatings}</p>}
-              {friendRatings.map((friendRating) => {
-                const isOpen = openFriendRatingId === friendRating.tastingId;
-                const friendGuessDetails = formatGuessDetails(friendRating.guesses);
-                const friendRevealedDetails = formatRevealedDetails(friendRating.revealedWine);
-
-                return (
-                  <article className="friendRatingCard" key={friendRating.tastingId}>
+                  <div className="ratingActions">
+                    <div className="guessScore">
+                      <span>{tasting.guessScore ?? "-"}</span>
+                      <p>{t.guessScore}</p>
+                    </div>
                     <button
-                      aria-expanded={isOpen}
-                      className="friendRatingRow"
-                      onClick={() =>
-                        setOpenFriendRatingId(isOpen ? null : friendRating.tastingId)
-                      }
+                      className="ghostButton compactButton"
+                      onClick={() => editTasting(tasting)}
                       type="button"
                     >
-                      <div className="scoreBadge">{friendRating.rating ?? "-"}</div>
-                      <div>
-                        <p className="wineMeta">
-                          {new Date(friendRating.tastedAt).toLocaleDateString("da-DK")} ·{" "}
-                          {t.ratedBy} {friendRating.friendName || "-"}
-                        </p>
-                        <strong className="friendRatingTitle">{friendRating.wineName}</strong>
-                        <span>{isOpen ? t.hideDetails : t.showDetails}</span>
-                      </div>
+                      <Edit3 size={17} />
+                      {t.edit}
                     </button>
+                    <button
+                      className="ghostButton dangerButton compactButton"
+                      onClick={() => deleteTasting(tasting)}
+                      type="button"
+                    >
+                      <Trash2 size={17} />
+                      {t.deleteTasting}
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
 
-                    {isOpen && (
-                      <div className="friendRatingDetails">
-                        <p className="eyebrow">{t.sharedDetails}</p>
-                        <p>
-                          {[
-                            friendRating.color ? displayColor(friendRating.color, language) : "",
-                            `${t.colorPrefixAcidity} ${friendRating.acidity || "-"}`,
-                            `${t.colorPrefixTannin} ${friendRating.tannin || "-"}`,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </p>
-                        <p>
-                          {t.noseLabel}: {displayNotes(friendRating.noseNotes, language)}
-                        </p>
-                        <p>
-                          {t.palateLabel}: {displayNotes(friendRating.palateNotes, language)}
-                        </p>
-                        {friendRating.structureNotes.length > 0 && (
+          {ratingsView === "friends" && (
+            <section className="friendRatingsPanel">
+              <p className="fieldHint">{t.friendsRatingsHelp}</p>
+              <div className="friendRatingList">
+                {friendRatings.length === 0 && (
+                  <div className="emptyState">
+                    <ClipboardList size={36} />
+                    <p>{t.noFriendRatings}</p>
+                  </div>
+                )}
+                {friendRatings.map((friendRating) => {
+                  const isOpen = openFriendRatingId === friendRating.tastingId;
+                  const friendGuessDetails = formatGuessDetails(friendRating.guesses);
+                  const friendRevealedDetails = formatRevealedDetails(friendRating.revealedWine);
+
+                  return (
+                    <article className="friendRatingCard" key={friendRating.tastingId}>
+                      <button
+                        aria-expanded={isOpen}
+                        className="friendRatingRow"
+                        onClick={() =>
+                          setOpenFriendRatingId(isOpen ? null : friendRating.tastingId)
+                        }
+                        type="button"
+                      >
+                        <div className="scoreBadge">{friendRating.rating ?? "-"}</div>
+                        <div>
+                          <p className="wineMeta">
+                            {new Date(friendRating.tastedAt).toLocaleDateString("da-DK")} ·{" "}
+                            {t.ratedBy} {friendRating.friendName || "-"}
+                          </p>
+                          <strong className="friendRatingTitle">{friendRating.wineName}</strong>
+                          <span>{isOpen ? t.hideDetails : t.showDetails}</span>
+                        </div>
+                      </button>
+
+                      {isOpen && (
+                        <div className="friendRatingDetails">
+                          <p className="eyebrow">{t.sharedDetails}</p>
                           <p>
-                            {t.characterLabel}:{" "}
-                            {friendRating.structureNotes
-                              .map((note) => displayStructure(note, language))
+                            {[
+                              friendRating.color ? displayColor(friendRating.color, language) : "",
+                              `${t.colorPrefixAcidity} ${friendRating.acidity || "-"}`,
+                              `${t.colorPrefixTannin} ${friendRating.tannin || "-"}`,
+                            ]
+                              .filter(Boolean)
                               .join(" · ")}
                           </p>
-                        )}
-                        <div className="friendRatingSharedBlock">
-                          <strong>{t.blindGuess}</strong>
-                          <p>{friendGuessDetails || "-"}</p>
-                        </div>
-                        <div className="friendRatingSharedBlock">
-                          <strong>{t.revealedWine}</strong>
-                          <p>{friendRating.revealedWine.name || t.notChosenYet}</p>
-                          {friendRevealedDetails && <p>{friendRevealedDetails}</p>}
-                          {friendRating.guessScore !== null && (
+                          <p>
+                            {t.noseLabel}: {displayNotes(friendRating.noseNotes, language)}
+                          </p>
+                          <p>
+                            {t.palateLabel}: {displayNotes(friendRating.palateNotes, language)}
+                          </p>
+                          {friendRating.structureNotes.length > 0 && (
                             <p>
-                              {t.guessScore}: {friendRating.guessScore}
+                              {t.characterLabel}:{" "}
+                              {friendRating.structureNotes
+                                .map((note) => displayStructure(note, language))
+                                .join(" · ")}
                             </p>
                           )}
+                          <div className="friendRatingSharedBlock">
+                            <strong>{t.blindGuess}</strong>
+                            <p>{friendGuessDetails || "-"}</p>
+                          </div>
+                          <div className="friendRatingSharedBlock">
+                            <strong>{t.revealedWine}</strong>
+                            <p>{friendRating.revealedWine.name || t.notChosenYet}</p>
+                            {friendRevealedDetails && <p>{friendRevealedDetails}</p>}
+                            {friendRating.guessScore !== null && (
+                              <p>
+                                {t.guessScore}: {friendRating.guessScore}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </section>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </section>
       )}
 
