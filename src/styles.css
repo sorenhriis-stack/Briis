@@ -681,16 +681,54 @@ input:disabled {
   gap: 10px;
 }
 
-.friendRatingRow {
-  align-items: center;
+.friendRatingCard {
   background: #fffdfa;
   border: 1px solid rgba(55, 47, 39, 0.14);
   border-radius: 8px;
+  overflow: hidden;
+}
+
+.friendRatingRow {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
   display: grid;
   gap: 14px;
   grid-template-columns: 58px minmax(0, 1fr);
   min-height: 82px;
   padding: 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.friendRatingRow span {
+  color: #7a1739;
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.friendRatingTitle {
+  color: #173d33;
+  display: block;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.friendRatingDetails {
+  border-top: 1px solid rgba(55, 47, 39, 0.12);
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px 14px 84px;
+}
+
+.friendRatingDetails p {
+  color: #6c635b;
+  margin-bottom: 0;
 }
 
 .ratingList {
@@ -841,6 +879,10 @@ input:disabled {
 
   .ratingActions {
     grid-column: 1 / -1;
+  }
+
+  .friendRatingDetails {
+    padding: 12px;
   }
 
   .inlineFields {

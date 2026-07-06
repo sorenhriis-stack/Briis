@@ -108,6 +108,12 @@ type FriendRatingRecord = {
   wineName: string;
   rating: number | null;
   tastedAt: string;
+  color: string;
+  noseNotes: string[];
+  palateNotes: string[];
+  structureNotes: string[];
+  acidity: string;
+  tannin: string;
   createdAt: string;
 };
 
@@ -177,6 +183,12 @@ type DbFriendRatingRow = {
   wine_name: string;
   rating: number | null;
   tasted_at: string;
+  color: string | null;
+  nose_notes: string[] | null;
+  palate_notes: string[] | null;
+  structure_notes: string[] | null;
+  acidity: string | null;
+  tannin: string | null;
   created_at: string;
 };
 
@@ -538,6 +550,9 @@ const copy = {
     friendsRatingsHelp: "See the newest ratings your friends have shared through Briis.",
     noFriendRatings: "No friend ratings yet.",
     ratedBy: "Rated by",
+    showDetails: "Show details",
+    hideDetails: "Hide details",
+    sharedDetails: "Shared tasting details",
   },
   da: {
     overviewLabel: "Briis overblik",
@@ -676,7 +691,10 @@ const copy = {
     friendsRatings: "Venners ratings",
     friendsRatingsHelp: "Se de nyeste ratings dine venner har delt gennem Briis.",
     noFriendRatings: "Ingen ratings fra venner endnu.",
-    ratedBy: "Rated af",
+    ratedBy: "Vurderet af",
+    showDetails: "Vis detaljer",
+    hideDetails: "Skjul detaljer",
+    sharedDetails: "Delte smagedetaljer",
   },
 };
 
@@ -978,6 +996,12 @@ function dbFriendRatingToRecord(row: DbFriendRatingRow): FriendRatingRecord {
     wineName: row.wine_name,
     rating: row.rating,
     tastedAt: row.tasted_at,
+    color: row.color ?? "",
+    noseNotes: row.nose_notes ?? [],
+    palateNotes: row.palate_notes ?? [],
+    structureNotes: row.structure_notes ?? [],
+    acidity: row.acidity ?? "",
+    tannin: row.tannin ?? "",
     createdAt: row.created_at,
   };
 }
@@ -1028,6 +1052,7 @@ function App() {
   const [friendCodeCopied, setFriendCodeCopied] = useState(false);
   const [friends, setFriends] = useState<FriendRecord[]>([]);
   const [friendRatings, setFriendRatings] = useState<FriendRatingRecord[]>([]);
+  const [openFriendRatingId, setOpenFriendRatingId] = useState<string | null>(null);
   const [friendCodeToAdd, setFriendCodeToAdd] = useState("");
   const [friendMessage, setFriendMessage] = useState<string | null>(null);
   const [customNoteOptions, setCustomNoteOptions] = useStoredState<CustomNotesByCategory>(
@@ -1091,6 +1116,7 @@ function App() {
       setFriendCodeCopied(false);
       setFriends([]);
       setFriendRatings([]);
+      setOpenFriendRatingId(null);
       setFriendCodeToAdd("");
       setFriendMessage(null);
       setDataLoading(false);
@@ -2745,18 +2771,61 @@ function App() {
             </div>
             <div className="friendRatingList">
               {friendRatings.length === 0 && <p className="fieldHint">{t.noFriendRatings}</p>}
-              {friendRatings.map((friendRating) => (
-                <article className="friendRatingRow" key={friendRating.tastingId}>
-                  <div className="scoreBadge">{friendRating.rating ?? "-"}</div>
-                  <div>
-                    <p className="wineMeta">
-                      {new Date(friendRating.tastedAt).toLocaleDateString("da-DK")} ·{" "}
-                      {t.ratedBy} {friendRating.friendName || "-"}
-                    </p>
-                    <h3>{friendRating.wineName}</h3>
-                  </div>
-                </article>
-              ))}
+              {friendRatings.map((friendRating) => {
+                const isOpen = openFriendRatingId === friendRating.tastingId;
+
+                return (
+                  <article className="friendRatingCard" key={friendRating.tastingId}>
+                    <button
+                      aria-expanded={isOpen}
+                      className="friendRatingRow"
+                      onClick={() =>
+                        setOpenFriendRatingId(isOpen ? null : friendRating.tastingId)
+                      }
+                      type="button"
+                    >
+                      <div className="scoreBadge">{friendRating.rating ?? "-"}</div>
+                      <div>
+                        <p className="wineMeta">
+                          {new Date(friendRating.tastedAt).toLocaleDateString("da-DK")} ·{" "}
+                          {t.ratedBy} {friendRating.friendName || "-"}
+                        </p>
+                        <strong className="friendRatingTitle">{friendRating.wineName}</strong>
+                        <span>{isOpen ? t.hideDetails : t.showDetails}</span>
+                      </div>
+                    </button>
+
+                    {isOpen && (
+                      <div className="friendRatingDetails">
+                        <p className="eyebrow">{t.sharedDetails}</p>
+                        <p>
+                          {[
+                            friendRating.color ? displayColor(friendRating.color, language) : "",
+                            `${t.colorPrefixAcidity} ${friendRating.acidity || "-"}`,
+                            `${t.colorPrefixTannin} ${friendRating.tannin || "-"}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                        <p>
+                          {t.noseLabel}: {displayNotes(friendRating.noseNotes, language)}
+                        </p>
+                        <p>
+                          {t.palateLabel}: {displayNotes(friendRating.palateNotes, language)}
+                        </p>
+                        {friendRating.structureNotes.length > 0 && (
+                          <p>
+                            {t.characterLabel}:{" "}
+                            {friendRating.structureNotes
+                              .map((note) => displayStructure(note, language))
+                              .join(" · ")}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
             </div>
           </section>
         </section>

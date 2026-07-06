@@ -422,6 +422,12 @@ returns table (
   wine_name text,
   rating integer,
   tasted_at date,
+  color text,
+  nose_notes text[],
+  palate_notes text[],
+  structure_notes text[],
+  acidity text,
+  tannin text,
   created_at timestamptz
 )
 language plpgsql
@@ -441,6 +447,12 @@ begin
     t.wine_name_snapshot,
     t.rating,
     t.tasted_at,
+    t.color,
+    t.nose_notes,
+    t.palate_notes,
+    t.structure_notes,
+    t.acidity,
+    t.tannin,
     t.created_at
   from public.friendships f
   join public.tastings t on t.user_id = f.friend_user_id

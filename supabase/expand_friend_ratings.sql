@@ -1,8 +1,9 @@
--- Briis: Add friends' ratings feed.
+-- Briis: Make friends' ratings openable with selected tasting details.
 -- Run in Supabase: Project -> SQL Editor -> New query -> Run.
 --
--- This returns a shared view of friends' tastings:
--- friend name, wine name, rating, date and selected tasting details.
+-- This replaces the friend ratings function. It shares only tasting details,
+-- not private cellar data, bottle counts, blind guesses, revealed wine fields,
+-- or free text notes.
 
 drop function if exists public.list_friend_ratings();
 
