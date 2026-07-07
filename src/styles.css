@@ -631,6 +631,55 @@ input:disabled {
   font-size: 0.86rem;
 }
 
+.suggestionField {
+  display: grid;
+  gap: 8px;
+}
+
+.wineSuggestionList {
+  background: #fffdfa;
+  border: 1px solid rgba(55, 47, 39, 0.14);
+  border-radius: 8px;
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.wineSuggestionList button {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(55, 47, 39, 0.1);
+  color: #3c342e;
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.wineSuggestionList button:last-child {
+  border-bottom: 0;
+}
+
+.wineSuggestionList button:hover {
+  background: rgba(217, 181, 91, 0.14);
+}
+
+.wineSuggestionList span {
+  color: #7a1739;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.wineSuggestionList strong {
+  color: #173d33;
+  font-size: 0.92rem;
+}
+
+.wineSuggestionList small {
+  color: #6c635b;
+  font-size: 0.8rem;
+}
+
 .fieldHint {
   margin-bottom: 0;
 }

@@ -29,6 +29,7 @@ type Tab = "cellar" | "add" | "tasting" | "ratings" | "profile";
 type Language = "en" | "da";
 type TastingSource = "own_bottle" | "coravin" | "other";
 type RatingsView = "mine" | "friends";
+type WineSuggestionSource = "own_cellar" | "friend_cellar" | "friend_revealed";
 type SortOption =
   | "vintage-desc"
   | "vintage-asc"
@@ -121,6 +122,21 @@ type FriendRatingRecord = {
   createdAt: string;
 };
 
+type WineSuggestionRecord = {
+  id: string;
+  source: WineSuggestionSource;
+  friendUserId: string | null;
+  friendName: string;
+  ownWineId: string | null;
+  name: string;
+  producer: string;
+  vintage: number | null;
+  grape: string;
+  region: string;
+  commune: string;
+  createdAt: string;
+};
+
 type DbWineRow = {
   id: string;
   name: string;
@@ -205,6 +221,20 @@ type DbFriendRatingRow = {
   revealed_region: string | null;
   revealed_commune: string | null;
   guess_score: number | null;
+  created_at: string;
+};
+
+type DbFriendWineSuggestionRow = {
+  suggestion_id: string;
+  source: "friend_cellar" | "friend_revealed";
+  friend_user_id: string;
+  friend_name: string | null;
+  name: string;
+  producer: string | null;
+  vintage: number | null;
+  grape: string | null;
+  region: string | null;
+  commune: string | null;
   created_at: string;
 };
 
@@ -505,6 +535,10 @@ const copy = {
     revealedWineName: "Wine name",
     revealedWinePlaceholder: "Restaurant, friend, tasting...",
     revealedWineDetailsLabel: "Revealed details",
+    wineSuggestions: "Wine suggestions",
+    ownCellarSuggestion: "From your cellar",
+    friendCellarSuggestion: "Added by",
+    friendTastingSuggestion: "Used by",
     cellarWineLocksManualFields: "Chosen from cellar",
     bottleType: "Bottle type",
     saveChanges: "Save changes",
@@ -649,6 +683,10 @@ const copy = {
     revealedWineName: "Vinens navn",
     revealedWinePlaceholder: "Restaurant, ven, smagning...",
     revealedWineDetailsLabel: "Facitdetaljer",
+    wineSuggestions: "Vinforslag",
+    ownCellarSuggestion: "Fra din kælder",
+    friendCellarSuggestion: "Tilføjet af",
+    friendTastingSuggestion: "Brugt af",
     cellarWineLocksManualFields: "Valgt fra kælder",
     bottleType: "Flasketype",
     saveChanges: "Gem ændringer",
@@ -840,6 +878,45 @@ function formatGuessDetails(guesses: TastingRecord["guesses"]) {
   return [guesses.vintage, guesses.grape, guesses.region, guesses.commune, guesses.producer]
     .filter(Boolean)
     .join(" · ");
+}
+
+function formatSuggestionDetails(suggestion: WineSuggestionRecord) {
+  return [
+    suggestion.producer,
+    suggestion.vintage,
+    suggestion.grape,
+    suggestion.region,
+    suggestion.commune,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function wineSuggestionSearchText(suggestion: WineSuggestionRecord) {
+  return [
+    suggestion.name,
+    suggestion.producer,
+    suggestion.vintage?.toString() ?? "",
+    suggestion.grape,
+    suggestion.region,
+    suggestion.commune,
+    suggestion.friendName,
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function wineSuggestionKey(suggestion: WineSuggestionRecord) {
+  return [
+    suggestion.name,
+    suggestion.producer,
+    suggestion.vintage?.toString() ?? "",
+    suggestion.grape,
+    suggestion.region,
+    suggestion.commune,
+  ]
+    .join("|")
+    .toLowerCase();
 }
 
 function average(numbers: Array<number | null | undefined>) {
@@ -1048,6 +1125,23 @@ function dbFriendRatingToRecord(row: DbFriendRatingRow): FriendRatingRecord {
   };
 }
 
+function dbFriendWineSuggestionToRecord(row: DbFriendWineSuggestionRow): WineSuggestionRecord {
+  return {
+    id: row.suggestion_id,
+    source: row.source,
+    friendUserId: row.friend_user_id,
+    friendName: row.friend_name ?? "",
+    ownWineId: null,
+    name: row.name,
+    producer: row.producer ?? "",
+    vintage: row.vintage,
+    grape: row.grape ?? "",
+    region: row.region ?? "",
+    commune: row.commune ?? "",
+    createdAt: row.created_at,
+  };
+}
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error) return error;
@@ -1077,6 +1171,18 @@ function friendlyFriendError(message: string, t: (typeof copy)[Language]) {
   return message;
 }
 
+function wineSuggestionSourceLabel(
+  suggestion: WineSuggestionRecord,
+  t: (typeof copy)[Language],
+) {
+  if (suggestion.source === "own_cellar") return t.ownCellarSuggestion;
+  if (suggestion.source === "friend_cellar") {
+    return `${t.friendCellarSuggestion} ${suggestion.friendName || "-"}`;
+  }
+
+  return `${t.friendTastingSuggestion} ${suggestion.friendName || "-"}`;
+}
+
 function App() {
   const [language, setLanguage] = useStoredState<Language>("briis.language", "en");
   const [activeTab, setActiveTab] = useState<Tab>("cellar");
@@ -1094,6 +1200,7 @@ function App() {
   const [friendCodeCopied, setFriendCodeCopied] = useState(false);
   const [friends, setFriends] = useState<FriendRecord[]>([]);
   const [friendRatings, setFriendRatings] = useState<FriendRatingRecord[]>([]);
+  const [friendWineSuggestions, setFriendWineSuggestions] = useState<WineSuggestionRecord[]>([]);
   const [openFriendRatingId, setOpenFriendRatingId] = useState<string | null>(null);
   const [ratingsView, setRatingsView] = useState<RatingsView>("mine");
   const [friendCodeToAdd, setFriendCodeToAdd] = useState("");
@@ -1159,6 +1266,7 @@ function App() {
       setFriendCodeCopied(false);
       setFriends([]);
       setFriendRatings([]);
+      setFriendWineSuggestions([]);
       setOpenFriendRatingId(null);
       setFriendCodeToAdd("");
       setFriendMessage(null);
@@ -1178,13 +1286,20 @@ function App() {
     setFriendMessage(null);
 
     try {
-      const [wineResult, tastingResult, profileResult, friendResult, friendRatingResult] =
-        await Promise.all([
+      const [
+        wineResult,
+        tastingResult,
+        profileResult,
+        friendResult,
+        friendRatingResult,
+        friendWineSuggestionResult,
+      ] = await Promise.all([
           client.from("wines").select("*").order("created_at", { ascending: false }),
           client.from("tastings").select("*").order("created_at", { ascending: false }),
           client.from("profiles").select("*").eq("user_id", session.user.id).maybeSingle(),
           client.rpc("list_friends"),
           client.rpc("list_friend_ratings"),
+          client.rpc("list_friend_wine_suggestions"),
         ]);
 
       if (wineResult.error) throw wineResult.error;
@@ -1192,6 +1307,7 @@ function App() {
       if (profileResult.error) throw profileResult.error;
       if (friendResult.error) throw friendResult.error;
       if (friendRatingResult.error) throw friendRatingResult.error;
+      if (friendWineSuggestionResult.error) throw friendWineSuggestionResult.error;
 
       setWines((wineResult.data ?? []).map((row) => dbWineToRecord(row as DbWineRow)));
       setTastings(
@@ -1207,6 +1323,11 @@ function App() {
       setFriends(((friendResult.data ?? []) as DbFriendRow[]).map(dbFriendToRecord));
       setFriendRatings(
         ((friendRatingResult.data ?? []) as DbFriendRatingRow[]).map(dbFriendRatingToRecord),
+      );
+      setFriendWineSuggestions(
+        ((friendWineSuggestionResult.data ?? []) as DbFriendWineSuggestionRow[]).map(
+          dbFriendWineSuggestionToRecord,
+        ),
       );
     } catch (error) {
       setSyncError(getErrorMessage(error));
@@ -1339,6 +1460,44 @@ function App() {
     [wines],
   );
 
+  const allWineSuggestions = useMemo(() => {
+    const ownWineSuggestions: WineSuggestionRecord[] = wines.map((wine) => ({
+      id: `own-cellar-${wine.id}`,
+      source: "own_cellar",
+      friendUserId: null,
+      friendName: "",
+      ownWineId: wine.id,
+      name: wine.name,
+      producer: wine.producer,
+      vintage: wine.vintage,
+      grape: wine.grape,
+      region: wine.region,
+      commune: wine.commune,
+      createdAt: wine.createdAt,
+    }));
+    const uniqueSuggestions = new Map<string, WineSuggestionRecord>();
+
+    [...ownWineSuggestions, ...friendWineSuggestions].forEach((suggestion) => {
+      const key = wineSuggestionKey(suggestion);
+      if (!uniqueSuggestions.has(key)) {
+        uniqueSuggestions.set(key, suggestion);
+      }
+    });
+
+    return Array.from(uniqueSuggestions.values());
+  }, [friendWineSuggestions, wines]);
+
+  const revealedWineSuggestions = useMemo(() => {
+    if (tastingForm.wineId) return [];
+
+    const search = tastingForm.revealedWineName.trim().toLowerCase();
+    if (search.length < 2) return [];
+
+    return allWineSuggestions
+      .filter((suggestion) => wineSuggestionSearchText(suggestion).includes(search))
+      .slice(0, 6);
+  }, [allWineSuggestions, tastingForm.revealedWineName, tastingForm.wineId]);
+
   const filteredCellarWines = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
 
@@ -1416,6 +1575,19 @@ function App() {
             revealedCommune: selectedWine.commune,
           }
         : {}),
+    }));
+  }
+
+  function selectWineSuggestion(suggestion: WineSuggestionRecord) {
+    setTastingForm((current) => ({
+      ...current,
+      wineId: suggestion.ownWineId ?? "",
+      revealedWineName: suggestion.name,
+      revealedProducer: suggestion.producer,
+      revealedVintage: suggestion.vintage?.toString() ?? "",
+      revealedGrape: suggestion.grape,
+      revealedRegion: suggestion.region,
+      revealedCommune: suggestion.commune,
     }));
   }
 
@@ -1861,6 +2033,16 @@ function App() {
           b.createdAt.localeCompare(a.createdAt),
         );
       });
+      const { data: suggestionData, error: suggestionError } = await client.rpc(
+        "list_friend_wine_suggestions",
+      );
+      if (suggestionError) throw suggestionError;
+
+      setFriendWineSuggestions(
+        ((suggestionData ?? []) as DbFriendWineSuggestionRow[]).map(
+          dbFriendWineSuggestionToRecord,
+        ),
+      );
       setFriendCodeToAdd("");
       setFriendMessage(t.friendAdded);
     } catch (error) {
@@ -2645,17 +2827,37 @@ function App() {
                   <span>{t.manualRevealedWineHelp}</span>
                 </div>
                 <div className="formGrid">
-                  <label>
-                    {t.revealedWineName}
-                    <input
-                      disabled={Boolean(tastingForm.wineId)}
-                      value={tastingForm.revealedWineName}
-                      onChange={(event) =>
-                        updateTastingForm("revealedWineName", event.target.value)
-                      }
-                      placeholder={t.revealedWinePlaceholder}
-                    />
-                  </label>
+                  <div className="suggestionField">
+                    <label htmlFor="revealed-wine-name">
+                      {t.revealedWineName}
+                      <input
+                        disabled={Boolean(tastingForm.wineId)}
+                        id="revealed-wine-name"
+                        value={tastingForm.revealedWineName}
+                        onChange={(event) =>
+                          updateTastingForm("revealedWineName", event.target.value)
+                        }
+                        placeholder={t.revealedWinePlaceholder}
+                      />
+                    </label>
+                    {revealedWineSuggestions.length > 0 && (
+                      <div className="wineSuggestionList" aria-label={t.wineSuggestions}>
+                        {revealedWineSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.id}
+                            onClick={() => selectWineSuggestion(suggestion)}
+                            type="button"
+                          >
+                            <span>{wineSuggestionSourceLabel(suggestion, t)}</span>
+                            <strong>{suggestion.name}</strong>
+                            {formatSuggestionDetails(suggestion) && (
+                              <small>{formatSuggestionDetails(suggestion)}</small>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <label>
                     {t.producer}
                     <input
