@@ -2540,17 +2540,6 @@ function App() {
             </div>
             <div className="formGrid">
               <label>
-                {t.rating}
-                <input
-                  max="100"
-                  min="1"
-                  placeholder={t.ratingPlaceholder}
-                  type="number"
-                  value={tastingForm.rating}
-                  onChange={(event) => updateTastingForm("rating", event.target.value)}
-                />
-              </label>
-              <label>
                 {t.color}
                 <select
                   value={tastingForm.color}
@@ -2565,32 +2554,6 @@ function App() {
                         </option>
                       ))}
                     </optgroup>
-                  ))}
-                </select>
-              </label>
-              <label>
-                {t.acidity}
-                <select
-                  value={tastingForm.acidity}
-                  onChange={(event) => updateTastingForm("acidity", event.target.value)}
-                >
-                  {intensityScale.map((step) => (
-                    <option key={step} value={step}>
-                      {step}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                {t.tannin}
-                <select
-                  value={tastingForm.tannin}
-                  onChange={(event) => updateTastingForm("tannin", event.target.value)}
-                >
-                  {intensityScale.map((step) => (
-                    <option key={step} value={step}>
-                      {step}
-                    </option>
                   ))}
                 </select>
               </label>
@@ -2692,6 +2655,35 @@ function App() {
               ))}
             </div>
 
+            <div className="formGrid">
+              <label>
+                {t.acidity}
+                <select
+                  value={tastingForm.acidity}
+                  onChange={(event) => updateTastingForm("acidity", event.target.value)}
+                >
+                  {intensityScale.map((step) => (
+                    <option key={step} value={step}>
+                      {step}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {t.tannin}
+                <select
+                  value={tastingForm.tannin}
+                  onChange={(event) => updateTastingForm("tannin", event.target.value)}
+                >
+                  {intensityScale.map((step) => (
+                    <option key={step} value={step}>
+                      {step}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
             <div className="noteSection">
               <div>
                 <p className="eyebrow">{t.character}</p>
@@ -2780,6 +2772,19 @@ function App() {
                       updateTastingForm("guessProducer", event.target.value)
                     }
                     placeholder="Producent"
+                  />
+                </label>
+              </div>
+              <div className="formGrid">
+                <label>
+                  {t.rating}
+                  <input
+                    max="100"
+                    min="1"
+                    placeholder={t.ratingPlaceholder}
+                    type="number"
+                    value={tastingForm.rating}
+                    onChange={(event) => updateTastingForm("rating", event.target.value)}
                   />
                 </label>
               </div>
